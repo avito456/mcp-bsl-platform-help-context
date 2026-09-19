@@ -13,6 +13,10 @@ class PlatformTypeNotFoundException(DomainException):
     pass
 
 
+class AmbiguousNameException(DomainException):
+    pass
+
+
 class TypeMemberNotFoundException(DomainException):
     pass
 

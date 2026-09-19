@@ -333,15 +333,17 @@ def create_server(config: AppConfig):
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)
-    def info(name: str, type_filter: str) -> str:
+    def info(name: str, type_filter: str | None = None) -> str:
         """Получить детальную информацию о конкретном элементе API платформы 1С.
 
         Возвращает полное описание, сигнатуры, параметры, возвращаемое значение.
         Используйте точное имя элемента (полученное через search).
 
         Args:
-            name: Точное имя элемента (например, 'НайтиПоСсылке', 'FindByRef', 'ТаблицаЗначений')
-            type_filter: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип)
+            name: Точное имя элемента (например, 'НайтиПоСсылкам', 'FindByRef', 'ТаблицаЗначений')
+            type_filter: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип).
+                Необязателен — при отсутствии тип определяется автоматически
+                (метод → свойство → тип); при неоднозначности будет возвращён список вариантов.
         """
         definition = service.get_info(name, type_filter)
         return formatter.format_member(definition)
