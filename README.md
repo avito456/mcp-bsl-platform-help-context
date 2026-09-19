@@ -158,23 +158,27 @@ mcp-bsl-context -p /path --warmup                               # Прогрев
 
 ## Интеграция
 
-### Инсталлятор (`scripts/install-mcp.py`)
+### Инсталлятор (`mcp-bsl-context install`)
 
-Самый простой способ подключить сервер к **opencode** и **Claude Code** — скрипт-инсталлятор.
-Он регистрирует MCP-сервер (project-скоп) в целевом проекте: создаёт `config.yml`, если его
-нет, вносит запись в `opencode.jsonc` и `.mcp.json`, а также добавляет описание инструментов
+Самый простой способ подключить сервер к **opencode** и **Claude Code** — подкоманда
+`install` (входит в `mcp-bsl-context`). Она регистрирует MCP-сервер (project-скоп)
+в целевом проекте: создаёт `config.yml`, если его нет, вносит запись
+в `opencode.jsonc` и `.mcp.json`, а также добавляет описание инструментов
 в `AGENTS.md`/`CLAUDE.md` проекта.
 
 ```bash
-uv run scripts/install-mcp.py                        # установить в текущий каталог
-uv run scripts/install-mcp.py --project ../my-1c-app --platform-path /opt/1cv8/x86_64
-uv run scripts/install-mcp.py --dry-run              # предпросмотр без записи
-uv run scripts/install-mcp.py --uninstall            # удалить регистрацию
+uv run mcp-bsl-context install                                  # в текущий каталог
+uv run mcp-bsl-context install --project ../my-1c-app --platform-path /opt/1cv8/x86_64
+uv run mcp-bsl-context install --dry-run                        # предпросмотр без записи
+uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить регистрацию
 ```
 
-Команды выполняются из корня этого репозитория (где лежит `scripts/`). Для запуска
-из любого каталога используйте абсолютный путь:
-`uv run --project /path/to/mcp-bsl-platform-help-context /path/to/mcp-bsl-platform-help-context/scripts/install-mcp.py ...`
+Команды выполняются из корня этого репозитория. Для запуска из любого каталога —
+с `--project <репо>`:
+`uv run --project /path/to/mcp-bsl-platform-help-context mcp-bsl-context install --project /path/to/1c-project`
+
+Дополнительные флаги: `--repo <path>` (переопределить server-репо для
+генерируемых команд), `--opencode-only` / `--claude-only`, `--dry-run`.
 
 Требуется `uv` на PATH. После установки проверьте: `opencode mcp list` и
 `claude mcp get bsl-context` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`
