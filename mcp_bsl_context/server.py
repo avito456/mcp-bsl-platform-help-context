@@ -364,12 +364,26 @@ def create_server(config: AppConfig):
                 + formatter.format_search_results(results, member_owner=storage.member_owner)
                 + fallback_note
             )
-        return (
+        output = (
             formatter.format_query(query)
             + formatter.format_search_results(
                 results, member_owner=storage.member_owner
             )
         )
+        if not results and not re.search(r"[. :]", query.strip()) and len(query.strip()) >= 3:
+            # Nothing found and the query looks like a plain identifier —
+            # offer closest-known names ("did you mean ...?").
+            suggestions = keyword_engine.suggest(query)
+            if suggestions:
+                lines = [
+                    "**Не найдено точных совпадений. Возможно, вы имели в виду:**"
+                ]
+                lines += [f"- `{s}`" for s in suggestions]
+                lines.append(
+                    "_Уточните запрос или вызовите info для одного из имён выше._"
+                )
+                output += "\n" + "\n".join(lines)
+        return output
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)

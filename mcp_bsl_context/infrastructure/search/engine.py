@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import logging
 import threading
 from typing import TYPE_CHECKING, Protocol
@@ -82,6 +83,16 @@ class SimpleSearchEngine:
         self._prefix_indexes.methods.load(self._storage.methods, name_fn)
         self._prefix_indexes.properties.load(self._storage.properties, name_fn)
         self._prefix_indexes.types.load(self._storage.types, name_fn)
+
+        seen_names: set[str] = set()
+        self._candidate_names: list[str] = []
+        for defn in (
+            self._storage.methods + self._storage.properties + self._storage.types
+        ):
+            for n in definition_names(defn):
+                if n and n not in seen_names:
+                    seen_names.add(n)
+                    self._candidate_names.append(n)
 
         logger.info(
             "Indexes loaded: %d methods, %d properties, %d types",
@@ -173,6 +184,23 @@ class SimpleSearchEngine:
             if member_lower in _names_lower(prop):
                 return prop
         return None
+
+    def suggest(self, query: str, limit: int = 5) -> list[str]:
+        """Fuzzy suggestions for a query that matched nothing.
+
+        Returns the canonical names (RU or EN) closest to ``query`` by edit
+        distance, so a caller can render a "did you mean ...?" hint.
+        """
+        self._ensure_initialized()
+        matched = query.strip()
+        if not matched:
+            return []
+        if any(n.lower() == matched.lower() for n in self._candidate_names):
+            return []
+        matches = difflib.get_close_matches(
+            matched, self._candidate_names, n=limit, cutoff=0.5
+        )
+        return [m for m in matches if m.lower() != matched.lower()]
 
 
 def _names_lower(defn: Definition) -> set[str]:

@@ -126,6 +126,15 @@ class TestSimpleSearchEngine:
         names = [r.name for r in results]
         assert "НайтиПоСсылке" in names
 
+    def test_suggest_returns_closest_names(self, sample_methods):
+        engine = self._make_engine(methods=sample_methods)
+        suggestions = engine.suggest("НайтиПоСсыцке")
+        assert "НайтиПоСсылке" in suggestions
+
+    def test_suggest_empty_for_exact_hit(self, sample_methods):
+        engine = self._make_engine(methods=sample_methods)
+        assert engine.suggest("НайтиПоКоду") == []
+
     def test_word_split_handles_yo(self, sample_methods):
         """Query words containing 'ё' are split and matched ('Жёсткий')."""
         engine = self._make_engine(
