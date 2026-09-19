@@ -132,10 +132,16 @@ class OpenAICompatibleReranker(Reranker):
 
         results: list[RankedResult] = []
         for item in data.get("results", []):
-            idx = item["index"]
-            score = float(
-                item.get("relevance_score", item.get("score", 0.0))
-            )
+            idx = item.get("index")
+            if idx is None:
+                logger.warning("Rerank response item missing 'index': %s", item)
+                continue
+            if not 0 <= idx < len(documents):
+                logger.warning(
+                    "Rerank response index %d out of range (0..%d)", idx, len(documents)
+                )
+                continue
+            score = float(item.get("relevance_score", item.get("score", 0.0)))
             results.append(
                 RankedResult(index=idx, score=score, text=documents[idx])
             )

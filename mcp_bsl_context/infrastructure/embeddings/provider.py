@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from abc import ABC, abstractmethod
 
 from mcp_bsl_context.config import EmbeddingsConfig
 
 logger = logging.getLogger(__name__)
+
+_MAX_MATRIX_RETRIES = 3
+_TIMEOUT = 120.0
 
 
 class EmbeddingProvider(ABC):
@@ -102,25 +106,53 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
         self._model = model
         self._api_key = api_key
         self._dim: int | None = None
+        self._client = None
+
+    def _get_client(self):
+        """Lazily create a persistent httpx.Client (connection reuse/keep-alive)."""
+        if self._client is None:
+            import httpx
+
+            headers: dict[str, str] = {"Content-Type": "application/json"}
+            if self._api_key:
+                headers["Authorization"] = f"Bearer {self._api_key}"
+            self._client = httpx.Client(
+                headers=headers,
+                timeout=httpx.Timeout(_TIMEOUT),
+            )
+        return self._client
 
     def _post_embeddings(self, texts: list[str]) -> list[list[float]]:
         import httpx
 
-        headers: dict[str, str] = {"Content-Type": "application/json"}
-        if self._api_key:
-            headers["Authorization"] = f"Bearer {self._api_key}"
+        client = self._get_client()
+        data = None
+        for attempt in range(_MAX_MATRIX_RETRIES):
+            try:
+                response = client.post(
+                    f"{self._api_url}/embeddings",
+                    json={"input": texts, "model": self._model},
+                )
+                response.raise_for_status()
+                data = response.json()
+                break
+            except (httpx.TransportError, httpx.HTTPStatusError) as exc:
+                if attempt < _MAX_MATRIX_RETRIES - 1:
+                    logger.warning(
+                        "Embedding API request failed (%s), retrying (%d/%d)",
+                        exc, attempt + 1, _MAX_MATRIX_RETRIES,
+                    )
+                    time.sleep(2**attempt)
+                    continue
+                raise
 
-        response = httpx.post(
-            f"{self._api_url}/embeddings",
-            json={"input": texts, "model": self._model},
-            headers=headers,
-            timeout=120.0,
-        )
-        response.raise_for_status()
-        data = response.json()
-
-        sorted_data = sorted(data["data"], key=lambda x: x["index"])
-        return [item["embedding"] for item in sorted_data]
+        items = sorted(data.get("data", []), key=lambda x: x.get("index", 0))
+        if len(items) != len(texts):
+            raise RuntimeError(
+                f"Embedding API returned {len(items)} vectors for "
+                f"{len(texts)} texts; refusing partial index"
+            )
+        return [item["embedding"] for item in items]
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         all_embeddings: list[list[float]] = []

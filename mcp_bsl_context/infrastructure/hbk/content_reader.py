@@ -33,13 +33,14 @@ class HbkContext:
                 self._name_set = set(self._zip.namelist())
 
             if normalized in self._name_set:
-                return self._zip.read(normalized).decode("utf-8", errors="replace")
+                # Pages carry a UTF-8 BOM (EF BB BF); utf-8-sig strips it
+                return self._zip.read(normalized).decode("utf-8-sig", errors="replace")
 
             # Try case-insensitive match
             lower = normalized.lower()
             for name in self._name_set:
                 if name.lower() == lower:
-                    return self._zip.read(name).decode("utf-8", errors="replace")
+                    return self._zip.read(name).decode("utf-8-sig", errors="replace")
         except (KeyError, zipfile.BadZipFile) as e:
             logger.warning("Failed to read page '%s': %s", path, e)
         return None

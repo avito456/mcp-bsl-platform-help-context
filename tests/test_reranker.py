@@ -1,5 +1,6 @@
 """Tests for Reranker abstraction and factory."""
 
+import httpx
 import pytest
 
 from mcp_bsl_context.config import RerankerConfig
@@ -46,6 +47,38 @@ class TestOpenAICompatibleReranker:
         )
         result = reranker.rerank("query", [], top_k=5)
         assert result == []
+
+    def test_malformed_items_are_skipped(self):
+        """Items missing 'index' or out of range must not crash the reranker."""
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(
+                200,
+                json={
+                    "results": [
+                        {"relevance_score": 0.9},  # no index -> skipped
+                        {"index": 5, "relevance_score": 0.8},  # out of range -> skipped
+                        {"index": 1, "relevance_score": 0.7},
+                        {"index": 0, "score": 0.6},  # legacy 'score' field
+                    ]
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        reranker = OpenAICompatibleReranker(
+            api_url="http://localhost:8080/v1", model="test"
+        )
+        from unittest.mock import patch
+
+        with httpx.Client(transport=transport) as client:
+            def fake_post(url, json=None, headers=None, timeout=None):
+                return client.post(url, json=json)
+
+            with patch.object(httpx, "post", side_effect=fake_post):
+                result = reranker.rerank("q", ["docA", "docB"], top_k=5)
+
+        assert [r.index for r in result] == [1, 0]
+        assert [r.text for r in result] == ["docB", "docA"]
 
 
 class TestLocalRerankerImport:

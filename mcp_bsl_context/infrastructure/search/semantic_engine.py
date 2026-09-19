@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import logging
 import threading
+import uuid
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mcp_bsl_context.domain.entities import Definition
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 
 COLLECTION_NAME = "platform_context"
 UPSERT_BATCH_SIZE = 100
+FINGERPRINT_FILE = "index-fingerprint.json"
+_FINGERPRINT_NAMESPACE = uuid.UUID("6f45a2e7-6d1e-4b2a-9c8d-3e5f7a1b9c0d")
 
 
 class SemanticSearchEngine:
@@ -41,6 +45,7 @@ class SemanticSearchEngine:
 
         self._embedder = embedding_provider
         self._reranker = reranker
+        self._qdrant_path = qdrant_path
         self._client = QdrantClient(path=qdrant_path)
         self._builder = DocumentBuilder()
         self._lookup: dict[tuple[str, str, str], Definition] = {}
@@ -54,6 +59,10 @@ class SemanticSearchEngine:
     ) -> None:
         """Prepare the engine: build lookup dict and index if needed.
 
+        The vector index carries a fingerprint derived from the platform content.
+        If the underlying data changes (new platform version, different HBK),
+        the fingerprint no longer matches and the index is rebuilt automatically.
+
         Args:
             storage: Loaded platform context storage.
             force_reindex: If True, rebuild the vector index from scratch.
@@ -65,8 +74,14 @@ class SemanticSearchEngine:
                 return
             storage.ensure_loaded()
             self._build_lookup(storage)
-            if force_reindex or not self._has_collection():
+            fingerprint = self._compute_fingerprint()
+            if (
+                force_reindex
+                or fingerprint != self._read_fingerprint()
+                or not self._has_collection()
+            ):
                 self._build_index(storage)
+                self._write_fingerprint(fingerprint)
             self._ready = True
 
     def search(
@@ -143,13 +158,50 @@ class SemanticSearchEngine:
         """Check if the Qdrant collection exists and contains points."""
         try:
             collections = self._client.get_collections().collections
-            for col in collections:
-                if col.name == COLLECTION_NAME:
-                    info = self._client.get_collection(COLLECTION_NAME)
-                    return info.points_count > 0
         except Exception:
-            pass
+            logger.exception("Failed to list Qdrant collections")
+            return False
+        for col in collections:
+            if col.name == COLLECTION_NAME:
+                try:
+                    info = self._client.get_collection(COLLECTION_NAME)
+                except Exception:
+                    logger.exception(
+                        "Failed to inspect collection '%s'", COLLECTION_NAME
+                    )
+                    return False
+                return info.points_count > 0
         return False
+
+    def _compute_fingerprint(self) -> str:
+        """Deterministic UUID5 fingerprint of the currently built lookup keys.
+
+        The fingerprint changes whenever the set of platform entities changes,
+        so an index built for another platform version is rebuilt automatically.
+        """
+        content = "\n".join(
+            f"{api_type}|{type_name}|{name}"
+            for api_type, type_name, name in sorted(self._lookup.keys())
+        )
+        return str(uuid.uuid5(_FINGERPRINT_NAMESPACE, content))
+
+    def _fingerprint_path(self) -> Path:
+        return Path(self._qdrant_path) / FINGERPRINT_FILE
+
+    def _read_fingerprint(self) -> str | None:
+        try:
+            value = self._fingerprint_path().read_text(encoding="utf-8").strip()
+            return value or None
+        except OSError:
+            return None
+
+    def _write_fingerprint(self, fingerprint: str) -> None:
+        try:
+            self._fingerprint_path().write_text(fingerprint, encoding="utf-8")
+        except OSError:
+            logger.exception(
+                "Failed to write index fingerprint to %s", self._fingerprint_path()
+            )
 
     def _build_index(self, storage: PlatformContextStorage) -> None:
         """Build the vector index from all entities in storage."""
@@ -164,12 +216,18 @@ class SemanticSearchEngine:
         texts = [doc.text for doc in docs]
         logger.info("Embedding %d documents...", len(texts))
         vectors = self._embedder.embed_documents(texts)
+        if len(vectors) != len(docs):
+            raise RuntimeError(
+                f"Embedding provider returned {len(vectors)} vectors "
+                f"for {len(docs)} documents; refusing partial index"
+            )
 
         # Recreate collection
         try:
             self._client.delete_collection(COLLECTION_NAME)
+            logger.info("Dropped existing collection '%s'", COLLECTION_NAME)
         except Exception:
-            pass
+            logger.debug("No existing collection to drop", exc_info=True)
 
         self._client.create_collection(
             collection_name=COLLECTION_NAME,
@@ -183,6 +241,11 @@ class SemanticSearchEngine:
         for i in range(0, len(docs), UPSERT_BATCH_SIZE):
             batch_docs = docs[i : i + UPSERT_BATCH_SIZE]
             batch_vectors = vectors[i : i + UPSERT_BATCH_SIZE]
+            if len(batch_docs) != len(batch_vectors):
+                raise RuntimeError(
+                    f"Batch size mismatch: {len(batch_docs)} docs vs "
+                    f"{len(batch_vectors)} vectors"
+                )
             points = [
                 PointStruct(id=doc.id, vector=vec, payload=doc.metadata)
                 for doc, vec in zip(batch_docs, batch_vectors)

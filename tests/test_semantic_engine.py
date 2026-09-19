@@ -11,6 +11,7 @@ from mcp_bsl_context.infrastructure.embeddings.provider import EmbeddingProvider
 from mcp_bsl_context.infrastructure.embeddings.reranker import RankedResult, Reranker
 from mcp_bsl_context.infrastructure.search.semantic_engine import (
     COLLECTION_NAME,
+    FINGERPRINT_FILE,
     SemanticSearchEngine,
 )
 
@@ -173,6 +174,80 @@ class TestSemanticSearchEngineIndex:
             reranker=None,
         )
         assert engine2._has_collection()
+
+
+class TestIndexFingerprint:
+    """The vector index is invalidated when the underlying content changes."""
+
+    def test_fingerprint_file_written(self, engine_no_reranker, tmp_path):
+        fp_path = tmp_path / "qdrant" / FINGERPRINT_FILE
+        assert fp_path.exists()
+        stored = fp_path.read_text(encoding="utf-8").strip()
+        assert stored == engine_no_reranker._compute_fingerprint()
+
+    def test_no_rebuild_when_content_unchanged(self, tmp_path, fake_storage):
+        provider = FakeEmbeddingProvider(dim=4)
+        engine1 = SemanticSearchEngine(
+            embedding_provider=provider,
+            qdrant_path=str(tmp_path / "qdrant"),
+            reranker=None,
+        )
+        engine1.ensure_ready(fake_storage)
+        engine1._client.close()
+
+        # Reopen: fingerprint matches, collection exists -> no rebuild needed
+        engine2 = SemanticSearchEngine(
+            embedding_provider=provider,
+            qdrant_path=str(tmp_path / "qdrant"),
+            reranker=None,
+        )
+        engine2.ensure_ready(fake_storage)
+        assert engine2._ready is True
+
+    def test_content_change_triggers_rebuild(self, tmp_path, fake_storage):
+        provider = FakeEmbeddingProvider(dim=4)
+        path = str(tmp_path / "qdrant")
+
+        engine1 = SemanticSearchEngine(
+            embedding_provider=provider, qdrant_path=path, reranker=None
+        )
+        engine1.ensure_ready(fake_storage)
+        engine1._client.close()
+        assert engine1._compute_fingerprint() != ""
+
+        class ChangedStorage:
+            methods = [
+                MethodDefinition(name="Сообщить", description="Вывод сообщения"),
+                MethodDefinition(name="НовыйМетод", description="Новый"),
+            ]
+            properties = []
+            types = []
+            _loaded = True
+
+            def ensure_loaded(self):
+                pass
+
+        changed = ChangedStorage()
+        engine2 = SemanticSearchEngine(
+            embedding_provider=provider, qdrant_path=path, reranker=None
+        )
+        engine2.ensure_ready(changed)
+        results = engine2.search("НовыйМетод", changed, limit=5)
+        # If the index had NOT been rebuilt, "НовыйМетод" would never be indexed.
+        assert any(r.name == "НовыйМетод" for r in results)
+
+    def test_embedding_count_mismatch_raises(self, tmp_path, fake_storage):
+        class CountMismatchProvider(FakeEmbeddingProvider):
+            def embed_documents(self, texts):
+                return [self._text_to_vec(t) for t in texts[:-1]]
+
+        engine = SemanticSearchEngine(
+            embedding_provider=CountMismatchProvider(dim=4),
+            qdrant_path=str(tmp_path / "qdrant"),
+            reranker=None,
+        )
+        with pytest.raises(RuntimeError, match="refusing partial index"):
+            engine.ensure_ready(fake_storage)
 
 
 class TestSemanticSearchWithReranker:
