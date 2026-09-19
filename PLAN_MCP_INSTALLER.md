@@ -35,7 +35,7 @@
 Запуск:
 
 ```bash
-python3 <server-repo>/scripts/install-mcp.py [--project <target>] [--platform-path PATH]
+uv run <server-repo>/scripts/install-mcp.py [--project <target>] [--platform-path PATH]
           [--opencode-only | --claude-only] [--dry-run] [--uninstall]
 ```
 
@@ -106,7 +106,7 @@ Canonical-текст раздела «MCP: контекст платформы 1
 
 ## Проверка
 
-1. `python3 scripts/install-mcp.py --project /tmp/пробный-1с-проект --dry-run` —
+1. `uv run scripts/install-mcp.py --project /tmp/пробный-1с-проект --dry-run` —
    превью без изменений.
 2. Прогон на реальном target (в т.ч. на этом репо):
    - `config.yml` создан, `platform.path` верный;

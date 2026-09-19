@@ -166,11 +166,15 @@ mcp-bsl-context -p /path --warmup                               # Прогрев
 в `AGENTS.md`/`CLAUDE.md` проекта.
 
 ```bash
-python3 scripts/install-mcp.py                        # установить в текущий каталог
-python3 scripts/install-mcp.py --project ../my-1c-app --platform-path /opt/1cv8/x86_64
-python3 scripts/install-mcp.py --dry-run              # предпросмотр без записи
-python3 scripts/install-mcp.py --uninstall            # удалить регистрацию
+uv run scripts/install-mcp.py                        # установить в текущий каталог
+uv run scripts/install-mcp.py --project ../my-1c-app --platform-path /opt/1cv8/x86_64
+uv run scripts/install-mcp.py --dry-run              # предпросмотр без записи
+uv run scripts/install-mcp.py --uninstall            # удалить регистрацию
 ```
+
+Команды выполняются из корня этого репозитория (где лежит `scripts/`). Для запуска
+из любого каталога используйте абсолютный путь:
+`uv run --project /path/to/mcp-bsl-platform-help-context /path/to/mcp-bsl-platform-help-context/scripts/install-mcp.py ...`
 
 Требуется `uv` на PATH. После установки проверьте: `opencode mcp list` и
 `claude mcp get bsl-context` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`

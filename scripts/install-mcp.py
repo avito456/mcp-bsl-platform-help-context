@@ -11,13 +11,15 @@ Targets:
 The target project is ``--project <path>`` or the current working directory.
 The server repository is derived from this script's location.
 
-Only stdlib is used, so it runs on any Python 3.10+ without a venv.
+Only stdlib is used, so it also runs on any Python 3.10+ without a venv (e.g.
+``python3 scripts/install-mcp.py``).
 
-Examples:
-  python3 install-mcp.py                          # install into cwd
-  python3 install-mcp.py --project ../my-1c-app   # install into a project
-  python3 install-mcp.py --dry-run                # preview, write nothing
-  python3 install-mcp.py --uninstall              # remove own changes
+Examples (run from the repository root):
+
+  uv run scripts/install-mcp.py                          # install into cwd
+  uv run scripts/install-mcp.py --project ../my-1c-app   # install into a project
+  uv run scripts/install-mcp.py --dry-run                # preview, write nothing
+  uv run scripts/install-mcp.py --uninstall              # remove own changes
 """
 
 from __future__ import annotations
@@ -182,7 +184,7 @@ def resolve_platform_path(target: Path, server_repo: Path, cli_path: str | None)
     raise SystemExit(
         _Color.warn(
             "Platform path not found. Pass it explicitly:\n"
-            "  python3 install-mcp.py --platform-path /opt/1cv8/x86_64\n"
+            "  uv run scripts/install-mcp.py --platform-path /opt/1cv8/x86_64\n"
             "or set MCP_BSL_PLATFORM_PATH."
         )
     )
