@@ -8,7 +8,17 @@ from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
+from mcp_bsl_context.domain.exceptions import DomainException
+
 logger = logging.getLogger(__name__)
+
+VALID_SEARCH_MODES = {"keyword", "semantic", "hybrid"}
+VALID_DATA_SOURCES = {"hbk", "json"}
+VALID_PROVIDERS = {"local", "openai-compatible"}
+
+
+class ConfigValidationError(DomainException):
+    """Raised when the resolved configuration is invalid."""
 
 
 @dataclass
@@ -77,6 +87,49 @@ class AppConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     index: IndexConfig = field(default_factory=IndexConfig)
     docs: DocsConfig = field(default_factory=DocsConfig)
+
+    def validate(self) -> None:
+        """Validate the resolved configuration, raising ConfigValidationError.
+
+        Called by the CLI and create_server so misconfigurations fail fast
+        with a readable message instead of a confusing runtime error.
+        """
+        errors: list[str] = []
+
+        if self.search.default_mode not in VALID_SEARCH_MODES:
+            errors.append(
+                f"search.default_mode='{self.search.default_mode}' is invalid. "
+                f"Expected one of: {', '.join(sorted(VALID_SEARCH_MODES))}"
+            )
+        if self.platform.data_source not in VALID_DATA_SOURCES:
+            errors.append(
+                f"platform.data_source='{self.platform.data_source}' is invalid. "
+                f"Expected one of: {', '.join(sorted(VALID_DATA_SOURCES))}"
+            )
+        if self.embeddings.provider not in VALID_PROVIDERS:
+            errors.append(
+                f"embeddings.provider='{self.embeddings.provider}' is invalid. "
+                f"Expected one of: {', '.join(sorted(VALID_PROVIDERS))}"
+            )
+        if self.reranker.provider not in VALID_PROVIDERS:
+            errors.append(
+                f"reranker.provider='{self.reranker.provider}' is invalid. "
+                f"Expected one of: {', '.join(sorted(VALID_PROVIDERS))}"
+            )
+        if self.platform.data_source == "json" and not self.platform.json_path:
+            errors.append(
+                "platform.json_path is required when "
+                "platform.data_source='json'"
+            )
+        if self.platform.data_source == "hbk" and not self.platform.path:
+            errors.append(
+                "platform.path is required when platform.data_source='hbk'"
+            )
+
+        if errors:
+            raise ConfigValidationError(
+                "Invalid configuration:\n- " + "\n- ".join(errors)
+            )
 
 
 # Mapping: env var name -> (section, field)
@@ -147,7 +200,7 @@ def _apply_yaml(config: AppConfig, config_path: str) -> None:
             continue
         section = getattr(config, section_name, None)
         if section is None:
-            logger.debug("Unknown config section: %s", section_name)
+            logger.warning("Unknown config section: %s", section_name)
             continue
         _set_section_fields(section, section_data)
 
@@ -185,7 +238,14 @@ def _set_section_fields(section: Any, data: dict[str, Any]) -> None:
     """Set fields on a section dataclass from a dict."""
     section_fields = {f.name: f for f in fields(section)}
     for key, value in data.items():
-        if key in section_fields and value is not None:
+        if key not in section_fields:
+            logger.warning(
+                "Unknown config key '%s' in section %s — ignored",
+                key,
+                type(section).__name__,
+            )
+            continue
+        if value is not None:
             _set_field_value(section, key, value)
 
 
@@ -196,30 +256,45 @@ def _set_field_value(obj: Any, field_name: str, value: Any) -> None:
         return
 
     coerced = _coerce_value(value, field_info.type)
-    object.__setattr__(obj, field_name, coerced)
+    if coerced is not None:
+        object.__setattr__(obj, field_name, coerced)
 
 
 def _coerce_value(value: Any, type_hint: str | type | None) -> Any:
-    """Coerce a value to match the target type hint."""
+    """Coerce a value to match the target type hint.
+
+    Invalid values for int/bool fields (e.g. a typo in an env var) are
+    logged and converted to ``None`` so the caller keeps the default
+    instead of crashing the whole server on startup.
+    """
     if value is None:
         return None
 
     type_str = str(type_hint) if type_hint else ""
+    nullable = "None" in type_str
 
     if "bool" in type_str:
         if isinstance(value, bool):
             return value
         if isinstance(value, str):
-            return value.lower() in ("true", "1", "yes")
+            normalized = value.lower()
+            if normalized in ("true", "1", "yes"):
+                return True
+            if normalized not in ("false", "0", "no", ""):
+                logger.warning(
+                    "Invalid boolean value %r — using False", value
+                )
+            return False
         return bool(value)
 
-    if "int" in type_str and "None" not in type_str:
-        return int(value)
-
-    if "int" in type_str and "None" in type_str:
+    if "int" in type_str:
         try:
             return int(value)
         except (ValueError, TypeError):
+            logger.warning(
+                "Invalid integer value %r — keeping default",
+                value,
+            )
             return None
 
     return value

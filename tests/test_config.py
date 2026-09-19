@@ -4,7 +4,15 @@ import os
 
 import pytest
 
-from mcp_bsl_context.config import AppConfig, load_config
+from mcp_bsl_context.config import (
+    AppConfig,
+    ConfigValidationError,
+    EmbeddingsConfig,
+    PlatformConfig,
+    RerankerConfig,
+    SearchConfig,
+    load_config,
+)
 
 
 class TestDefaults:
@@ -156,3 +164,78 @@ class TestPriority:
 
         config = load_config(config_path=str(config_file))
         assert config.server.port == 2000
+
+
+class TestCoercion:
+    def test_invalid_int_env_keeps_default(self, monkeypatch):
+        monkeypatch.setenv("MCP_BSL_PORT", "not-a-number")
+        config = load_config()
+        assert config.server.port == 8080  # default preserved, no crash
+
+    def test_invalid_bool_env_keeps_false(self, monkeypatch):
+        monkeypatch.setenv("MCP_BSL_VERBOSE", "banana")
+        config = load_config()
+        assert config.server.verbose is False
+
+    def test_invalid_reindex_env_keeps_false(self, monkeypatch):
+        monkeypatch.setenv("MCP_BSL_INDEX_REINDEX", "1x")
+        config = load_config()
+        assert config.index.reindex is False
+
+
+class TestValidate:
+    def test_valid_config_passes(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.validate()  # should not raise
+
+    def test_invalid_search_mode(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.search = SearchConfig(default_mode="bogus")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_invalid_embeddings_provider(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.embeddings = EmbeddingsConfig(provider="nope")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_invalid_reranker_provider(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.reranker = RerankerConfig(enabled=True, provider="nope")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_json_source_requires_json_path(self):
+        config = AppConfig()
+        config.platform = PlatformConfig(data_source="json", json_path=None)
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_hbk_source_requires_path(self):
+        config = AppConfig()
+        config.platform = PlatformConfig(data_source="hbk", path="")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_invalid_data_source(self):
+        config = AppConfig()
+        config.platform = PlatformConfig(data_source="oracle")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_validation_error_message_lists_issues(self):
+        config = AppConfig()  # empty hbk path + invalid mode
+        config.search = SearchConfig(default_mode="bogus")
+        with pytest.raises(ConfigValidationError) as excinfo:
+            config.validate()
+        assert "search.default_mode" in str(excinfo.value)
+
+    def test_json_source_with_json_path_passes(self):
+        config = AppConfig()
+        config.platform = PlatformConfig(data_source="json", json_path="/tmp/json")
+        config.validate()  # should not raise

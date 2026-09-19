@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import importlib.resources as pkg_resources
+import functools
 import logging
 import threading
 from pathlib import Path
+from typing import Any, Callable
 
 from mcp_bsl_context.config import AppConfig
 from mcp_bsl_context.domain.docs_service import DocsInfoService, DocsLoadException
@@ -66,7 +68,8 @@ class _LazySemanticState:
                 return
             try:
                 self._do_init()
-            except Exception as exc:
+            except ImportError as exc:
+                # Missing dependencies are permanent — cache the failure.
                 self._init_error = (
                     f"Failed to initialize semantic search: {exc}. "
                     "Use mode='keyword' or install dependencies: "
@@ -74,6 +77,16 @@ class _LazySemanticState:
                 )
                 self._initialized = True
                 raise RuntimeError(self._init_error) from exc
+            except Exception as exc:
+                # Transient failures (network, API timeouts) are NOT cached:
+                # the next request will retry initialization.
+                logger.exception(
+                    "Semantic search initialization failed; will retry on next request"
+                )
+                raise RuntimeError(
+                    f"Failed to initialize semantic search: {exc}. "
+                    "Try again or use mode='keyword'."
+                ) from exc
             self._initialized = True
 
     def initialize(self) -> None:
@@ -158,6 +171,8 @@ def create_server(config: AppConfig):
     """
     from fastmcp import FastMCP
 
+    config.validate()
+
     instructions = (
         "Этот MCP-сервер предоставляет доступ к документации API платформы "
         "1С:Предприятие. Инструкции по использованию инструментов:\n"
@@ -192,7 +207,7 @@ def create_server(config: AppConfig):
     # Wire dependencies
     loader = PlatformContextLoader()
 
-    if config.platform.data_source == "json" and config.platform.json_path:
+    if config.platform.data_source == "json":
         storage = _create_json_storage(config.platform.json_path)
         version_info = PlatformVersionInfo(
             active_version=None,
@@ -220,6 +235,26 @@ def create_server(config: AppConfig):
             )
         return text
 
+    def _safe_call(domain_handler: Callable[[DomainException], str]) -> Callable:
+        """Wrap a tool so unexpected exceptions never leak a traceback to the client."""
+        def decorator(fn: Callable) -> Callable:
+            @functools.wraps(fn)
+            def wrapper(*args: Any, **kwargs: Any) -> str:
+                try:
+                    return fn(*args, **kwargs)
+                except DomainException as e:
+                    return domain_handler(e)
+                except RuntimeError as e:
+                    return f"**Error:** {e}"
+                except Exception:
+                    logger.exception("Unexpected error in tool '%s'", fn.__name__)
+                    return (
+                        "**Внутренняя ошибка:** произошла непредвиденная ошибка. "
+                        "Попробуйте ещё раз или используйте режим keyword."
+                    )
+            return wrapper
+        return decorator
+
     # Lazy-loaded semantic/hybrid components
     semantic_state = _LazySemanticState(config, storage, keyword_engine)
 
@@ -229,6 +264,7 @@ def create_server(config: AppConfig):
         semantic_state.initialize()
 
     @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
     def search(
         query: str,
         mode: str | None = None,
@@ -269,27 +305,23 @@ def create_server(config: AppConfig):
         if limit is not None:
             effective_limit = max(MIN_LIMIT, min(limit, MAX_LIMIT))
 
-        try:
-            if effective_mode == "keyword":
-                results = service.search_all(query, type, effective_limit)
-            elif effective_mode == "semantic":
-                results = semantic_state.semantic_search(
-                    query, limit=effective_limit, type_filter=type
-                )
-            else:  # hybrid
-                results = semantic_state.hybrid_search(
-                    query, limit=effective_limit, type_filter=type
-                )
-            return (
-                formatter.format_query(query)
-                + formatter.format_search_results(results)
+        if effective_mode == "keyword":
+            results = service.search_all(query, type, effective_limit)
+        elif effective_mode == "semantic":
+            results = semantic_state.semantic_search(
+                query, limit=effective_limit, type_filter=type
             )
-        except DomainException as e:
-            return formatter.format_error(e)
-        except RuntimeError as e:
-            return f"**Error:** {e}"
+        else:  # hybrid
+            results = semantic_state.hybrid_search(
+                query, limit=effective_limit, type_filter=type
+            )
+        return (
+            formatter.format_query(query)
+            + formatter.format_search_results(results)
+        )
 
     @mcp.tool()
+    @_safe_call(_format_lookup_error)
     def info(name: str, type: str) -> str:
         """Получить детальную информацию о конкретном элементе API платформы 1С.
 
@@ -300,13 +332,11 @@ def create_server(config: AppConfig):
             name: Точное имя элемента (например, 'НайтиПоСсылке', 'FindByRef', 'ТаблицаЗначений')
             type: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип)
         """
-        try:
-            definition = service.get_info(name, type)
-            return formatter.format_member(definition)
-        except DomainException as e:
-            return _format_lookup_error(e)
+        definition = service.get_info(name, type)
+        return formatter.format_member(definition)
 
     @mcp.tool()
+    @_safe_call(_format_lookup_error)
     def get_member(type_name: str, member_name: str) -> str:
         """Получить информацию о методе или свойстве конкретного типа платформы 1С.
 
@@ -314,13 +344,11 @@ def create_server(config: AppConfig):
             type_name: Имя типа (например, 'СправочникСсылка', 'CatalogRef', 'ТаблицаЗначений'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
             member_name: Имя метода или свойства внутри типа (например, 'Добавить', 'Количество')
         """
-        try:
-            definition = service.find_member_by_type_and_name(type_name, member_name)
-            return formatter.format_member(definition)
-        except DomainException as e:
-            return _format_lookup_error(e)
+        definition = service.find_member_by_type_and_name(type_name, member_name)
+        return formatter.format_member(definition)
 
     @mcp.tool()
+    @_safe_call(_format_lookup_error)
     def get_members(type_name: str) -> str:
         """Получить полный список методов и свойств типа платформы 1С.
 
@@ -330,13 +358,11 @@ def create_server(config: AppConfig):
         Args:
             type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'СправочникОбъект'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
         """
-        try:
-            members = service.find_type_members(type_name)
-            return formatter.format_type_members(members)
-        except DomainException as e:
-            return _format_lookup_error(e)
+        members = service.find_type_members(type_name)
+        return formatter.format_type_members(members)
 
     @mcp.tool()
+    @_safe_call(_format_lookup_error)
     def get_constructors(type_name: str) -> str:
         """Получить сигнатуры конструкторов для создания экземпляров типа платформы 1С.
 
@@ -345,13 +371,11 @@ def create_server(config: AppConfig):
         Args:
             type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'Массив'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
         """
-        try:
-            constructors = service.find_constructors(type_name)
-            return formatter.format_constructors(constructors, type_name)
-        except DomainException as e:
-            return _format_lookup_error(e)
+        constructors = service.find_constructors(type_name)
+        return formatter.format_constructors(constructors, type_name)
 
     @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
     def get_platform_info() -> str:
         """Получить информацию о текущей версии платформы 1С и доступных версиях.
 
@@ -384,17 +408,16 @@ def create_server(config: AppConfig):
     docs_service = _create_docs_service(config)
 
     @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
     def get_coding_guideline() -> str:
         """Получить рекомендации по стилю кода BSL (1С:Предприятие).
 
         Возвращает полный набор рекомендаций по написанию качественного кода 1С.
         """
-        try:
-            return docs_service.get_guideline()
-        except DomainException as e:
-            return formatter.format_error(e)
+        return docs_service.get_guideline()
 
     @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
     def get_strict_typing_info(topic: str) -> str:
         """Получить документацию по строгой типизации BSL по теме.
 
@@ -407,12 +430,10 @@ def create_server(config: AppConfig):
             topic: Название темы (например, 'overview', 'arrays', 'constructor-functions')
                    или 'topics' для списка всех тем.
         """
-        try:
-            return docs_service.get_strict_typing_info(topic)
-        except DomainException as e:
-            return formatter.format_error(e)
+        return docs_service.get_strict_typing_info(topic)
 
     @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
     def search_strict_typing(query: str) -> str:
         """Поиск по документации строгой типизации BSL.
 
@@ -422,10 +443,7 @@ def create_server(config: AppConfig):
         Args:
             query: Поисковый запрос (например, 'Массив', 'конструктор', 'ТаблицаЗначений')
         """
-        try:
-            return docs_service.search_strict_typing(query)
-        except DomainException as e:
-            return formatter.format_error(e)
+        return docs_service.search_strict_typing(query)
 
     return mcp
 
@@ -490,17 +508,7 @@ def _create_json_storage(json_path: str) -> PlatformContextStorage:
     json_loader = JsonContextLoader()
     methods, properties, types = json_loader.load_all(Path(json_path))
 
-    from mcp_bsl_context.infrastructure.storage.storage import build_member_index
-
-    # Create a dummy storage and populate it directly
-    storage = PlatformContextStorage.__new__(PlatformContextStorage)
-    storage.methods = methods
-    storage.properties = properties
-    storage.types = types
-    storage.members, storage.member_owner = build_member_index(types)
-    storage._loaded = True
-    storage._lock = __import__("threading").RLock()
-    return storage
+    return PlatformContextStorage.from_loaded_data(methods, properties, types)
 
 
 def _load_docs_content(custom_path: str | None, default_filename: str) -> str:

@@ -110,20 +110,12 @@ def main() -> None:
         if not app_config.server.verbose:
             logging.getLogger("mcp.server.lowlevel.server").setLevel(logging.WARNING)
 
-        if app_config.platform.data_source == "hbk" and not app_config.platform.path:
-            click.echo(
-                "Error: platform.path is required for HBK data source. "
-                "Set via --platform-path, MCP_BSL_PLATFORM_PATH, or config file.",
-                err=True,
-            )
-            sys.exit(1)
+        from mcp_bsl_context.config import ConfigValidationError
 
-        if app_config.platform.data_source == "json" and not app_config.platform.json_path:
-            click.echo(
-                "Error: platform.json_path is required for JSON data source. "
-                "Set via --json-path, MCP_BSL_JSON_PATH, or config file.",
-                err=True,
-            )
+        try:
+            app_config.validate()
+        except ConfigValidationError as exc:
+            click.echo(f"Error: {exc}", err=True)
             sys.exit(1)
 
         from mcp_bsl_context.server import create_server

@@ -53,6 +53,26 @@ class PlatformContextStorage:
         self._loaded = False
         self._lock = threading.RLock()
 
+    @classmethod
+    def from_loaded_data(
+        cls,
+        methods: list[MethodDefinition],
+        properties: list[PropertyDefinition],
+        types: list[PlatformTypeDefinition],
+    ) -> "PlatformContextStorage":
+        """Create a storage pre-populated with already-loaded data.
+
+        Used by data sources (e.g. JSON loader) that bypass HBK parsing.
+        The storage reports itself as loaded, so no loader is needed.
+        """
+        storage = cls(loader=None, platform_path=Path())
+        storage.methods = methods
+        storage.properties = properties
+        storage.types = types
+        storage.members, storage.member_owner = build_member_index(types)
+        storage._loaded = True
+        return storage
+
     def ensure_loaded(self) -> None:
         """Ensure context is loaded (double-checked locking)."""
         if self._loaded:
