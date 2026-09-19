@@ -79,8 +79,12 @@ class DocumentBuilder:
 
         if type_name:
             parts.append(f"{type_name}.{method.name}")
+            if method.name_en:
+                parts.append(f"Alias: {type_name}.{method.name_en}")
         else:
             parts.append(method.name)
+            if method.name_en:
+                parts.append(f"Alias: {method.name_en}")
 
         if method.description:
             parts.append(method.description)
@@ -99,6 +103,7 @@ class DocumentBuilder:
         doc_id = _make_id("method", method.name, type_name)
         metadata = {
             "name": method.name,
+            "name_en": method.name_en or "",
             "api_type": "method",
             "type_name": type_name or "",
             "text": text,
@@ -113,8 +118,12 @@ class DocumentBuilder:
 
         if type_name:
             parts.append(f"{type_name}.{prop.name}")
+            if prop.name_en:
+                parts.append(f"Alias: {type_name}.{prop.name_en}")
         else:
             parts.append(prop.name)
+            if prop.name_en:
+                parts.append(f"Alias: {prop.name_en}")
 
         if prop.description:
             parts.append(prop.description)
@@ -129,6 +138,7 @@ class DocumentBuilder:
         doc_id = _make_id("property", prop.name, type_name)
         metadata = {
             "name": prop.name,
+            "name_en": prop.name_en or "",
             "api_type": "property",
             "type_name": type_name or "",
             "text": text,
@@ -140,6 +150,8 @@ class DocumentBuilder:
     ) -> EmbeddingDocument:
         """Build a document from a type definition."""
         parts: list[str] = [type_def.name]
+        if type_def.name_en:
+            parts.append(f"Alias: {type_def.name_en}")
 
         if type_def.description:
             parts.append(type_def.description)
@@ -162,6 +174,7 @@ class DocumentBuilder:
         doc_id = _make_id("type", type_def.name, None)
         metadata = {
             "name": type_def.name,
+            "name_en": type_def.name_en or "",
             "api_type": "type",
             "type_name": "",
             "text": text,
