@@ -97,9 +97,35 @@ class CompoundTypeSearch:
 
 
 class TypeMemberSearch:
-    """Priority 2: Type.Member pattern queries."""
+    """Priority 1 (exact) / 2 (partial): "Type.Member" pattern queries.
+
+    Splits the query on dots (``Type.Member``), double colons
+    (``Type::Member``) and whitespace ("Type Member"), resolves the type
+    through the alias-aware indexes, and matches members by exact or
+    prefix name in either language.  Exact type+member pairs rank at
+    priority ``EXACT_PRIORITY`` so they surface ahead of every other
+    strategy; partial matches keep ``priority = 2``.
+    """
 
     priority = 2
+    EXACT_PRIORITY = 1
+
+    @staticmethod
+    def _split_tokens(query: str) -> list[str]:
+        """Split a query into candidate type/member token groups.
+
+        The raw query is split on whitespace, then every token is further
+        split on ``.`` and ``::``, yielding e.g. ``["ТаблицаЗначений",
+        "Добавить"]`` for "ТаблицаЗначений.Добавить".
+        """
+        tokens: list[str] = []
+        for part in query.strip().split():
+            for sub in re.split(r"[.::]+", part):
+                sub = sub.strip()
+                if sub:
+                    tokens.append(sub)
+        tokens = [t for t in tokens if t not in ("<", ">", "{", "}")]
+        return tokens
 
     def search(
         self,
@@ -108,59 +134,84 @@ class TypeMemberSearch:
         prefix_indexes: Indexes,
         api_type: ApiType | None,
     ) -> list[SearchResult]:
-        words = query.strip().split()
-        if len(words) < 2:
+        if api_type is not None and api_type not in (ApiType.METHOD, ApiType.PROPERTY):
             return []
 
-        if api_type is not None and api_type not in (ApiType.METHOD, ApiType.PROPERTY):
+        tokens = self._split_tokens(query)
+        if len(tokens) < 2:
             return []
 
         results: list[SearchResult] = []
         seen: set[tuple[str, str, str]] = set()
 
-        # Try splitting at each position: words[:i] as type, words[i:] as member
-        for split_pos in range(1, len(words)):
-            type_name = "".join(words[:split_pos])
-            member_name = "".join(words[split_pos:])
+        def _add(
+            member: Definition,
+            owner_type: str,
+            matched: int,
+            exact: bool,
+        ) -> None:
+            key = definition_key(member, owner_type)
+            if key in seen:
+                return
+            seen.add(key)
+            priority = self.EXACT_PRIORITY if exact else self.priority
+            results.append(
+                SearchResult(member, priority, matched, owner_type)
+            )
 
-            type_matches = hash_indexes.types.get(type_name)
-            if not type_matches:
-                type_matches = prefix_indexes.types.get(type_name)
+        # Resolve the type from every prefix of the token list, trying both
+        # compressed (camelCase) and space-joined reconstructions.  The last
+        # token (or tokens) form the candidate member name.
+        type_coverage: dict[str, list[PlatformTypeDefinition]] = {}
+        for split_pos in range(1, len(tokens)):
+            word = "".join(tokens[:split_pos])
+            if word not in type_coverage:
+                matches = hash_indexes.types.get(word)
+                if not matches:
+                    matches = prefix_indexes.types.get(word)
+                type_coverage[word] = [
+                    t for t in matches if isinstance(t, PlatformTypeDefinition)
+                ]
 
-            for type_def in type_matches:
-                if not isinstance(type_def, PlatformTypeDefinition):
-                    continue
-                member_lower = member_name.lower()
-                for method in type_def.methods:
-                    if api_type is not None and api_type != ApiType.METHOD:
-                        continue
-                    if any(
-                        n.lower().startswith(member_lower)
-                        for n in definition_names(method)
-                    ):
-                        key = definition_key(method, type_def.name)
-                        if key not in seen:
-                            seen.add(key)
-                            results.append(
-                                SearchResult(
-                                    method, self.priority, split_pos + 1, type_def.name
-                                )
-                            )
-                for prop in type_def.properties:
-                    if api_type is not None and api_type != ApiType.PROPERTY:
-                        continue
-                    if any(
-                        n.lower().startswith(member_lower)
-                        for n in definition_names(prop)
-                    ):
-                        key = definition_key(prop, type_def.name)
-                        if key not in seen:
-                            seen.add(key)
-                            results.append(
-                                SearchResult(
-                                    prop, self.priority, split_pos + 1, type_def.name
-                                )
-                            )
+        for split_pos in range(1, len(tokens)):
+            word = "".join(tokens[:split_pos])
+            types = type_coverage.get(word) or []
+            member_candidates = [tokens[split_pos:]]
+            if len(tokens) > split_pos + 1:
+                member_candidates.append(
+                    ["".join(tokens[split_pos:])]
+                )
+
+            for type_def in types:
+                for member_words in member_candidates:
+                    member_word = member_words[0]
+                    member_lower = member_word.lower()
+                    for method in type_def.methods:
+                        if api_type is not None and api_type != ApiType.METHOD:
+                            continue
+                        if any(
+                            n.lower() == member_lower
+                            for n in definition_names(method)
+                        ):
+                            _add(method, type_def.name, split_pos + 1, exact=True)
+                        elif any(
+                            n.lower().startswith(member_lower)
+                            for n in definition_names(method)
+                        ):
+                            _add(method, type_def.name, split_pos + 1, exact=False)
+                    for prop in type_def.properties:
+                        if api_type is not None and api_type != ApiType.PROPERTY:
+                            continue
+                        if any(
+                            n.lower() == member_lower
+                            for n in definition_names(prop)
+                        ):
+                            _add(prop, type_def.name, split_pos + 1, exact=True)
+                        elif any(
+                            n.lower().startswith(member_lower)
+                            for n in definition_names(prop)
+                        ):
+                            _add(prop, type_def.name, split_pos + 1, exact=False)
 
         return results
 
