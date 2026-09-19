@@ -28,25 +28,25 @@ P2:
 
 ## Этап A — P0: корректность данных для AI
 
-- [ ] A1. Алиасы в сущностях: name_en в MethodDefinition/PropertyDefinition/PlatformTypeDefinition (+ mapper, json_loader).
-- [ ] A2. Индексы по обоим именам: HashIndex/StartWithIndex на несколько ключей, find_* матчат по алиасам, дедуп по RU-ключу.
-- [ ] A3. Стратегия «Тип.Метод»: split по `.`/`::`/пробелам, точный Type.Member → топ.
-- [ ] A4. Owner-тип в выдаче: форматтер + server показывают `ТаблицаЗначений.Добавить (method)`.
-- [ ] A5. info: type_filter=None → autodetect method/property/type, при неоднозначности — варианты.
-- [ ] A6. document_builder: en-имя и EN-описание в embed-текст.
+- [x] A1. Алиасы в сущностях: name_en в MethodDefinition/PropertyDefinition/PlatformTypeDefinition (+ mapper, json_loader).
+- [x] A2. Индексы по обоим именам: HashIndex/StartWithIndex на несколько ключей, find_* матчат по алиасам, дедуп по RU-ключу.
+- [x] A3. Стратегия «Тип.Метод»: split по `.`/`::`/пробелам, точный Type.Member → топ.
+- [x] A4. Owner-тип в выдаче: форматтер + server показывают `ТаблицаЗначений.Добавить (method)`.
+- [x] A5. info: type_filter=None → autodetect method/property/type, при неоднозначности — варианты.
+- [x] A6. document_builder: en-имя и EN-описание в embed-текст.
 
 ## Этап B — P1: документация и UX
 
-- [ ] B7. Вычистить фейковые имена из SERVER_INSTRUCTIONS, docstrings, README, CLAUDE.md.
-- [ ] B8. Инструмент health/status (версия, источник, готовность семантики) + конфиг warmup.
-- [ ] B9. Авто-fallback: hybrid/semantic при недоступных моделях → keyword с пометкой.
-- [ ] B10. Фикс escape шаблонных имён (code-span без `\<`).
+- [x] B7. Вычистить фейковые имена из SERVER_INSTRUCTIONS, docstrings, README, CLAUDE.md.
+- [x] B8. Инструмент health/status (версия, источник, готовность семантики) + конфиг warmup.
+- [x] B9. Авто-fallback: hybrid/semantic при недоступных моделях → keyword с пометкой.
+- [x] B10. Фикс escape шаблонных имён (code-span без `\<`).
 
 ## Этап C — P2: качество
 
-- [ ] C11. Fuzzy (Damerau-Levenshtein) в keyword + «Did you mean» в info/get_member.
-- [ ] C12. Двуязычные описания инструментов + EN-блок в SERVER_INSTRUCTIONS.
-- [ ] C13. Интеграционные тесты на реальном HBK + grep-guard от фейковых имён.
+- [x] C11. Fuzzy (ближайшие по расстоянию редактирования) в keyword + «Did you mean» в search при пустом результате.
+- [x] C12. Двуязычные описания инструментов + EN-блок в SERVER_INSTRUCTIONS.
+- [x] C13. Интеграционные тесты на реальном HBK + grep-guard от фейковых имён.
 
 ## Проверка
 
