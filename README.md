@@ -158,6 +158,64 @@ mcp-bsl-context -p /path --warmup                               # Прогрев
 
 ## Интеграция
 
+### Инсталлятор (`scripts/install-mcp.py`)
+
+Самый простой способ подключить сервер к **opencode** и **Claude Code** — скрипт-инсталлятор.
+Он регистрирует MCP-сервер (project-скоп) в целевом проекте: создаёт `config.yml`, если его
+нет, вносит запись в `opencode.jsonc` и `.mcp.json`, а также добавляет описание инструментов
+в `AGENTS.md`/`CLAUDE.md` проекта.
+
+```bash
+python3 scripts/install-mcp.py                        # установить в текущий каталог
+python3 scripts/install-mcp.py --project ../my-1c-app --platform-path /opt/1cv8/x86_64
+python3 scripts/install-mcp.py --dry-run              # предпросмотр без записи
+python3 scripts/install-mcp.py --uninstall            # удалить регистрацию
+```
+
+Требуется `uv` на PATH. После установки проверьте: `opencode mcp list` и
+`claude mcp get bsl-context` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`
+утверждается при первом запуске (`/mcp`).
+
+### opencode
+
+Добавьте в `opencode.jsonc` корня проекта (инсталлятор делает это автоматически):
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "bsl-context": {
+      "type": "local",
+      "command": ["uv", "run", "--project", "/path/to/mcp-bsl-platform-help-context", "mcp-bsl-context", "-c", "/path/to/project/config.yml"],
+      "cwd": "/path/to/project",
+      "enabled": true
+    }
+  }
+}
+```
+
+### Claude Code
+
+Добавьте в `.mcp.json` корня проекта (инсталлятор делает это автоматически):
+
+```json
+{
+  "mcpServers": {
+    "bsl-context": {
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--project", "/path/to/mcp-bsl-platform-help-context", "mcp-bsl-context", "-c", "/path/to/project/config.yml"]
+    }
+  }
+}
+```
+
+Либо через CLI: `claude mcp add --scope project bsl-context -- uv run --project /path/to/mcp-bsl-platform-help-context mcp-bsl-context -c /path/to/project/config.yml`
+
+> В `config.yml` должен быть задан `platform.path` (инсталлятор создаёт этот файл
+> с путём к платформе 1С, если его нет). Если `config.yml` отсутствует, команда
+> запустится с `-p`/env-переопределениями.
+
 ### Claude Desktop
 
 Добавьте в `claude_desktop_config.json`:

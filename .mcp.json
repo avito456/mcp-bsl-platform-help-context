@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "bsl-context": {
+      "type": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "/Users/ev/workspace/mcp-bsl-platform-help-context",
+        "mcp-bsl-context",
+        "-c",
+        "/Users/ev/workspace/mcp-bsl-platform-help-context/config.yml"
+      ]
+    }
+  }
+}

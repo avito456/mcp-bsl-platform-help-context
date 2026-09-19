@@ -9,6 +9,20 @@
         "--mcp"
       ],
       "enabled": true
+    },
+    "bsl-context": {
+      "type": "local",
+      "command": [
+        "uv",
+        "run",
+        "--project",
+        "/Users/ev/workspace/mcp-bsl-platform-help-context",
+        "mcp-bsl-context",
+        "-c",
+        "/Users/ev/workspace/mcp-bsl-platform-help-context/config.yml"
+      ],
+      "cwd": "/Users/ev/workspace/mcp-bsl-platform-help-context",
+      "enabled": true
     }
   }
 }
