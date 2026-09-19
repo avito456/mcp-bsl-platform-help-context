@@ -126,6 +126,15 @@ class _LazySemanticState:
                 ) from exc
             self._initialized = True
 
+    @property
+    def status(self) -> str:
+        """Human-readable semantic readiness for the ``health`` tool."""
+        if not self._initialized:
+            return "not-initialized (first semantic/hybrid call will load models and index)"
+        if self._init_error:
+            return f"failed: {self._init_error}"
+        return "ready"
+
     def initialize(self) -> None:
         """Eagerly load models and ensure the index is ready.
 
@@ -271,6 +280,15 @@ def create_server(config: AppConfig):
     if config.index.reindex:
         logger.info("--reindex requested: building semantic index at startup...")
         semantic_state.initialize()
+
+    # Warmup: load models and prepare the index without rebuilding.
+    # Non-fatal — keyword search keeps working if semantic is unavailable.
+    if config.index.warmup and not config.index.reindex:
+        try:
+            logger.info("Warmup requested: loading semantic components...")
+            semantic_state.initialize()
+        except RuntimeError as exc:
+            logger.warning("Semantic warmup failed (keyword mode still works): %s", exc)
 
     @mcp.tool()
     @_safe_call(lambda e: formatter.format_error(e))
@@ -425,6 +443,40 @@ def create_server(config: AppConfig):
         else:
             parts.append("\n*Single-version mode — no other versions discovered.*")
 
+        return "\n".join(parts)
+
+    @mcp.tool()
+    @_safe_call(lambda e: formatter.format_error(e))
+    def health() -> str:
+        """Получить статус сервера и готовность поисковых режимов.
+
+        Полезен перед первым semantic/hybrid-запросом: семантика лениво
+        инициализируется (скачивание моделей и сборка индекса) при первом
+        обращении, что может занимать минуты. Возвращает версию платформы,
+        источник данных, статистику контекста и состояние семантики.
+        """
+        try:
+            storage.ensure_loaded()
+            semantic_status = semantic_state.status
+            loaded = "yes"
+        except Exception as exc:
+            semantic_status = "n/a"
+            loaded = "no"
+        parts: list[str] = ["## Server health\n"]
+        parts.append(f"**Platform version:** {version_info.active_version or 'unknown'}")
+        parts.append(f"**Data source:** {config.platform.data_source}")
+        parts.append(
+            f"**Context loaded:** {loaded}"
+            f" — {len(storage.methods)} methods, "
+            f"{len(storage.properties)} properties, "
+            f"{len(storage.types)} types"
+        )
+        parts.append(f"**Semantic search:** {semantic_status}")
+        parts.append(f"**Default search mode:** {config.search.default_mode}")
+        if config.index.reindex:
+            parts.append("**Index:** forced rebuild on startup")
+        elif config.index.warmup:
+            parts.append("**Index:** warmup on startup")
         return "\n".join(parts)
 
     # --- Documentation tools (strict typing, coding guidelines) ---

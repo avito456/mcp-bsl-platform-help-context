@@ -68,6 +68,7 @@ class StorageConfig:
 @dataclass
 class IndexConfig:
     reindex: bool = False
+    warmup: bool = False  # загрузить модели семантики при старте (не пересобирая индекс)
 
 
 @dataclass
@@ -154,6 +155,7 @@ _ENV_MAPPING: dict[str, tuple[str, str]] = {
     "MCP_BSL_STORAGE_QDRANT_PATH": ("storage", "qdrant_path"),
     "MCP_BSL_STORAGE_MODELS_CACHE": ("storage", "models_cache"),
     "MCP_BSL_INDEX_REINDEX": ("index", "reindex"),
+    "MCP_BSL_INDEX_WARMUP": ("index", "warmup"),
     "MCP_BSL_DOCS_STRICT_TYPES_PATH": ("docs", "strict_types_path"),
     "MCP_BSL_DOCS_GUIDELINE_PATH": ("docs", "guideline_path"),
 }

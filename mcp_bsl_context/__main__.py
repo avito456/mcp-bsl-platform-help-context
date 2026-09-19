@@ -61,6 +61,13 @@ def main() -> None:
         help="Force rebuild of the semantic index from the HBK file on startup "
         "(overrides config/env)",
     )
+    @click.option(
+        "--warmup",
+        is_flag=True,
+        default=None,
+        help="Load semantic models and prepare the index at startup (no rebuild; "
+        "overrides config/env)",
+    )
     def cli(
         config: str | None,
         platform_path: str | None,
@@ -71,6 +78,7 @@ def main() -> None:
         json_path: str | None,
         verbose: bool | None,
         reindex: bool | None,
+        warmup: bool | None,
     ) -> None:
         """MCP server for 1C:Enterprise BSL platform context.
 
@@ -91,6 +99,7 @@ def main() -> None:
             "server.port": port,
             "server.verbose": verbose,
             "index.reindex": reindex,
+            "index.warmup": warmup,
         }
 
         app_config = load_config(config_path=config, cli_overrides=cli_overrides)
