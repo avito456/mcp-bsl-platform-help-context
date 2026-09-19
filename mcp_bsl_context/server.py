@@ -332,15 +332,37 @@ def create_server(config: AppConfig):
         if limit is not None:
             effective_limit = max(MIN_LIMIT, min(limit, MAX_LIMIT))
 
+        fallback_note = ""
         if effective_mode == "keyword":
             results = service.search_all(query, type_filter, effective_limit)
-        elif effective_mode == "semantic":
-            results = semantic_state.semantic_search(
-                query, limit=effective_limit, type_filter=type_filter
-            )
-        else:  # hybrid
-            results = semantic_state.hybrid_search(
-                query, limit=effective_limit, type_filter=type_filter
+        else:
+            try:
+                if effective_mode == "semantic":
+                    results = semantic_state.semantic_search(
+                        query, limit=effective_limit, type_filter=type_filter
+                    )
+                else:  # hybrid
+                    results = semantic_state.hybrid_search(
+                        query, limit=effective_limit, type_filter=type_filter
+                    )
+            except RuntimeError as exc:
+                # Semantic/hybrid unavailable — degrade to keyword and say so,
+                # so the model isn't misled into thinking a semantic search ran.
+                logger.warning(
+                    "%s search unavailable (%s); falling back to keyword",
+                    effective_mode,
+                    exc,
+                )
+                results = service.search_all(query, type_filter, effective_limit)
+                fallback_note = (
+                    "\n_Режим %s недоступен (%s); показаны результаты "
+                    "keyword-поиска._\n" % (effective_mode, exc)
+                )
+        if fallback_note:
+            return (
+                formatter.format_query(query)
+                + formatter.format_search_results(results, member_owner=storage.member_owner)
+                + fallback_note
             )
         return (
             formatter.format_query(query)
