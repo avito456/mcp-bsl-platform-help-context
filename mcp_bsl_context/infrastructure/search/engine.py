@@ -12,6 +12,7 @@ from mcp_bsl_context.domain.entities import (
     PlatformTypeDefinition,
     PropertyDefinition,
     definition_key,
+    definition_names,
 )
 from mcp_bsl_context.domain.value_objects import SearchQuery
 
@@ -72,7 +73,7 @@ class SimpleSearchEngine:
             self._initialized = True
 
     def _load_indexes(self) -> None:
-        name_fn = lambda item: item.name
+        name_fn = lambda item: definition_names(item)
 
         self._hash_indexes.methods.load(self._storage.methods, name_fn)
         self._hash_indexes.properties.load(self._storage.properties, name_fn)
@@ -166,9 +167,14 @@ class SimpleSearchEngine:
             return None
         member_lower = member_name.lower()
         for method in type_def.methods:
-            if method.name.lower() == member_lower:
+            if member_lower in _names_lower(method):
                 return method
         for prop in type_def.properties:
-            if prop.name.lower() == member_lower:
+            if member_lower in _names_lower(prop):
                 return prop
         return None
+
+
+def _names_lower(defn: Definition) -> set[str]:
+    """Lowercased lookup names of a definition (RU + EN aliases)."""
+    return {n.lower() for n in definition_names(defn)}

@@ -12,6 +12,7 @@ from mcp_bsl_context.domain.entities import (
     PlatformTypeDefinition,
     PropertyDefinition,
     definition_key,
+    definition_names,
 )
 from mcp_bsl_context.domain.enums import ApiType
 
@@ -133,7 +134,10 @@ class TypeMemberSearch:
                 for method in type_def.methods:
                     if api_type is not None and api_type != ApiType.METHOD:
                         continue
-                    if method.name.lower().startswith(member_lower):
+                    if any(
+                        n.lower().startswith(member_lower)
+                        for n in definition_names(method)
+                    ):
                         key = definition_key(method, type_def.name)
                         if key not in seen:
                             seen.add(key)
@@ -145,7 +149,10 @@ class TypeMemberSearch:
                 for prop in type_def.properties:
                     if api_type is not None and api_type != ApiType.PROPERTY:
                         continue
-                    if prop.name.lower().startswith(member_lower):
+                    if any(
+                        n.lower().startswith(member_lower)
+                        for n in definition_names(prop)
+                    ):
                         key = definition_key(prop, type_def.name)
                         if key not in seen:
                             seen.add(key)
@@ -236,8 +243,10 @@ class WordOrderSearch:
         ) -> None:
             if api_type is not None and expected_type is not None and api_type != expected_type:
                 return
-            name_lower = item.name.lower()
-            matched = sum(1 for w in words if w in name_lower)
+            names_lower = [n.lower() for n in definition_names(item)]
+            matched = sum(
+                1 for w in words if any(w in nl for nl in names_lower)
+            )
             if matched > 0:
                 effective_owner = owner.get(id(item), type_name)
                 key = definition_key(item, effective_owner)
@@ -321,8 +330,9 @@ class WordOrderSearch:
         if self._index_signature != signature:
             index: dict[str, list[Definition]] = {}
             for item in pool:
-                for token in _split_words(item.name):
-                    index.setdefault(token, []).append(item)
+                for alias in definition_names(item):
+                    for token in _split_words(alias):
+                        index.setdefault(token, []).append(item)
             self._word_index = index
             self._index_signature = signature
         return self._word_index
