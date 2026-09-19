@@ -65,8 +65,13 @@ SERVER_INSTRUCTIONS = (
     "рекомендаций по стилю кода — get_coding_guideline.\n"
     "8. get_platform_info сообщает версию платформы, для которой доступна "
     "документация.\n"
-    "9. Если поиск не дал результатов, попробуйте другой режим или более "
-    "общий термин; не выдумывайте имена API, которых нет в ответах."
+    "9. Если поиск не дал результатов, посмотрите предложенные варианты "
+    "(Возможно, вы имели в виду) или попробуйте другой режим/более общий "
+    "термин; не выдумывайте имена API, которых нет в ответах.\n"
+    "10. health сообщает статус сервера и готовность режимов поиска. "
+    "Первый semantic/hybrid-запрос может занять несколько минут "
+    "(инициализация моделей); при недоступности семантики search вернёт "
+    "результаты keyword с пометкой."
 )
 
 
@@ -318,6 +323,11 @@ def create_server(config: AppConfig):
             - Шаблонные типы справочников/документов указываются как
               'СправочникОбъект.<Имя справочника>' (с угловыми скобками).
             - semantic/hybrid-режимы понимают запросы на естественном языке.
+
+        EN: Search 1C platform API docs by a Russian or English term, a type name,
+        or a 'Type.Member' query (e.g. 'ТаблицаЗначений.Добавить'). keyword mode
+        returns exact API names for use in info/get_member/get_members.
+        If nothing matched, closest-known names are suggested.
         """
         effective_mode = mode or config.search.default_mode
         if effective_mode not in VALID_MODES:
@@ -398,6 +408,9 @@ def create_server(config: AppConfig):
             type_filter: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип).
                 Необязателен — при отсутствии тип определяется автоматически
                 (метод → свойство → тип); при неоднозначности будет возвращён список вариантов.
+
+        EN: Get detailed info about an API element by exact name (Russian or
+        English). type_filter is optional; ambiguity is reported back.
         """
         definition = service.get_info(name, type_filter)
         return formatter.format_member(definition)
@@ -410,6 +423,9 @@ def create_server(config: AppConfig):
         Args:
             type_name: Имя типа (например, 'СправочникСсылка', 'CatalogRef', 'ТаблицаЗначений'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
             member_name: Имя метода или свойства внутри типа (например, 'Добавить', 'Количество')
+
+        EN: Get a method or property of a specific type by exact names
+        (Russian or English; owner type name plus member name, e.g. 'ValueTable','Add').
         """
         definition = service.find_member_by_type_and_name(type_name, member_name)
         return formatter.format_member(definition, type_name)
@@ -431,6 +447,9 @@ def create_server(config: AppConfig):
             type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'СправочникОбъект'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
             limit: Максимальное количество выводимых членов (1–100, по умолчанию 20)
             offset: Смещение для постраничного просмотра (по умолчанию 0)
+
+        EN: List methods and properties of a type, paged (limit/offset).
+        Accepts type names in Russian or English.
         """
         members = service.find_type_members(type_name)
         effective_limit = max(1, min(limit, 100))
@@ -448,6 +467,9 @@ def create_server(config: AppConfig):
 
         Args:
             type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'Массив'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
+
+        EN: Get constructor signatures for instantiating a 1C platform type.
+        Accepts type names in Russian or English (e.g. 'Массив' or 'Array').
         """
         constructors = service.find_constructors(type_name)
         return formatter.format_constructors(constructors, type_name)
@@ -459,6 +481,8 @@ def create_server(config: AppConfig):
 
         Возвращает активную версию, путь к HBK-файлу и список всех
         обнаруженных версий платформы.
+
+        EN: Report the active 1C platform version, HBK path, and all detected versions.
         """
         parts: list[str] = []
 
@@ -490,6 +514,10 @@ def create_server(config: AppConfig):
         инициализируется (скачивание моделей и сборка индекса) при первом
         обращении, что может занимать минуты. Возвращает версию платформы,
         источник данных, статистику контекста и состояние семантики.
+
+        EN: Server readiness — platform version, data source, context stats
+        (counts), and semantic-search state (not-initialized/failed/ready).
+
         """
         try:
             storage.ensure_loaded()
@@ -525,6 +553,8 @@ def create_server(config: AppConfig):
         """Получить рекомендации по стилю кода BSL (1С:Предприятие).
 
         Возвращает полный набор рекомендаций по написанию качественного кода 1С.
+
+        EN: Get BSL (1C:Enterprise) coding-style guidelines and best practices.
         """
         return docs_service.get_guideline()
 
@@ -541,6 +571,8 @@ def create_server(config: AppConfig):
         Args:
             topic: Название темы (например, 'overview', 'arrays', 'constructor-functions')
                    или 'topics' для списка всех тем.
+
+        EN: Get strict-typing docs for a topic ('topics' lists available topics).
         """
         return docs_service.get_strict_typing_info(topic)
 
@@ -554,6 +586,8 @@ def create_server(config: AppConfig):
 
         Args:
             query: Поисковый запрос (например, 'Массив', 'конструктор', 'ТаблицаЗначений')
+
+        EN: Text-search strict-typing docs; returns matching sections with context.
         """
         return docs_service.search_strict_typing(query)
 
