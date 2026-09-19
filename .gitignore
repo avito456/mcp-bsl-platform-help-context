@@ -13,3 +13,5 @@ venv/
 data/
 mcp-data/
 config.yml
+.codegraph
+
