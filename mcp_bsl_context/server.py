@@ -76,6 +76,14 @@ class _LazySemanticState:
                 raise RuntimeError(self._init_error) from exc
             self._initialized = True
 
+    def initialize(self) -> None:
+        """Eagerly load models and ensure the index is ready.
+
+        Used at startup when a forced reindex is requested (``--reindex``),
+        so the semantic index is (re)built before the first client request.
+        """
+        self._ensure_initialized()
+
     def _do_init(self) -> None:
         from mcp_bsl_context.infrastructure.embeddings.provider import (
             create_embedding_provider,
@@ -172,6 +180,11 @@ def create_server(config: AppConfig):
 
     # Lazy-loaded semantic/hybrid components
     semantic_state = _LazySemanticState(config, storage, keyword_engine)
+
+    # Forced reindex: eagerly build the semantic index before serving requests
+    if config.index.reindex:
+        logger.info("--reindex requested: building semantic index at startup...")
+        semantic_state.initialize()
 
     @mcp.tool()
     def search(

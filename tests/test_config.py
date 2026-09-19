@@ -94,6 +94,11 @@ class TestEnvVars:
         config = load_config()
         assert config.server.verbose is False
 
+    def test_env_index_reindex_true(self, monkeypatch):
+        monkeypatch.setenv("MCP_BSL_INDEX_REINDEX", "true")
+        config = load_config()
+        assert config.index.reindex is True
+
 
 class TestCliOverrides:
     def test_cli_overrides_env(self, monkeypatch):
@@ -118,6 +123,15 @@ class TestCliOverrides:
     def test_platform_version_override(self):
         config = load_config(cli_overrides={"platform.version": "8.3.20"})
         assert config.platform.version == "8.3.20"
+
+    def test_index_reindex_override(self):
+        config = load_config(cli_overrides={"index.reindex": True})
+        assert config.index.reindex is True
+
+    def test_env_overriden_by_cli_reindex(self, monkeypatch):
+        monkeypatch.setenv("MCP_BSL_INDEX_REINDEX", "true")
+        config = load_config(cli_overrides={"index.reindex": False})
+        assert config.index.reindex is False
 
 
 class TestPriority:

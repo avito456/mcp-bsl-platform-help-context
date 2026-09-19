@@ -71,10 +71,18 @@ pip install -e ".[dev]"         # + pytest для разработки
 pip install -e ".[local]"       # + sentence-transformers, torch (semantic/hybrid search)
 ```
 
+Через [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv sync                       # Базовая установка (keyword search)
+uv sync --extra local --extra dev   # + локальные ML-модели и dev (pytest)
+uv run mcp-bsl-context -c config.yml
+```
+
 ### Зависимости
 
 - Python 3.10+
-- fastmcp >= 2.0
+- fastmcp >= 4.0
 - beautifulsoup4 >= 4.12
 - lxml >= 5.0
 - click >= 8.1
@@ -106,6 +114,7 @@ mcp-bsl-context -c config.yml
 --data-source              Источник данных: hbk или json
 --json-path                Путь к каталогу с JSON-файлами
 --verbose, -v              Включить отладочное логирование
+--reindex                  Принудительная пересборка семантического индекса из HBK
 ```
 
 ### Переменные окружения
@@ -119,6 +128,7 @@ mcp-bsl-context -c config.yml
 | `--data-source` | `MCP_BSL_DATA_SOURCE` | `hbk` |
 | `--json-path` | `MCP_BSL_JSON_PATH` | — |
 | `--verbose` | `MCP_BSL_VERBOSE` | `false` |
+| `--reindex` | `MCP_BSL_INDEX_REINDEX` | `false` |
 | `--host` | `MCP_BSL_HOST` | `127.0.0.1` |
 | — | `MCP_BSL_DOCS_STRICT_TYPES_PATH` | null (встроенный) |
 | — | `MCP_BSL_DOCS_GUIDELINE_PATH` | null (встроенный) |
@@ -139,6 +149,7 @@ mcp-bsl-context -p /opt/1cv8/x86_64                            # Автоопр�
 mcp-bsl-context -p /opt/1cv8/x86_64 --platform-version 8.3.20  # Ближайшая к 8.3.20
 mcp-bsl-context -p /path -m streamable-http --port 8080         # Streamable HTTP транспорт
 mcp-bsl-context -p /path --data-source json --json-path /path   # JSON источник
+mcp-bsl-context -p /path --reindex                              # Пересборка семантического индекса
 ```
 
 ## Интеграция
@@ -366,6 +377,17 @@ pytest -v tests/test_search_engine.py::test_name  # Один тест
 Поддерживаются версии HBK до 8.3.27+ включительно (multi-page data chains, изменённые TOC-коды языков, CSS-классы `V8SH_heading`/`V8SH_chapter`).
 
 Альтернативно можно использовать pre-exported JSON (через [platform-context-exporter](https://github.com/alkoleft/platform-context-exporter)).
+
+## Индексация
+
+- **Keyword-индекс** строится автоматически при старте сервера (в памяти, без отдельной команды).
+- **Семантический индекс** (Qdrant, каталог `storage.qdrant_path`, по умолчанию `./data/qdrant`) строится лениво при первом `semantic`/`hybrid`-запросе и переиспользуется между запусками.
+
+Для принудительной пересборки семантического индекса из HBK используйте флаг `--reindex` (или `MCP_BSL_INDEX_REINDEX=true`, или `index.reindex: true` в `config.yml`). Индекс пересоберётся при первом semantic/hybrid-запросе после старта сервера:
+
+```bash
+mcp-bsl-context -c config.yml --reindex
+```
 
 ## Благодарности
 

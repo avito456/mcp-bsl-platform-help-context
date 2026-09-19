@@ -59,6 +59,13 @@ def main() -> None:
         default=None,
         help="Enable debug logging (overrides config/env)",
     )
+    @click.option(
+        "--reindex",
+        is_flag=True,
+        default=None,
+        help="Force rebuild of the semantic index from the HBK file on startup "
+        "(overrides config/env)",
+    )
     def cli(
         config: str | None,
         platform_path: str | None,
@@ -68,6 +75,7 @@ def main() -> None:
         data_source: str | None,
         json_path: str | None,
         verbose: bool | None,
+        reindex: bool | None,
     ) -> None:
         """MCP server for 1C:Enterprise BSL platform context.
 
@@ -87,6 +95,7 @@ def main() -> None:
             "server.mode": mode,
             "server.port": port,
             "server.verbose": verbose,
+            "index.reindex": reindex,
         }
 
         app_config = load_config(config_path=config, cli_overrides=cli_overrides)

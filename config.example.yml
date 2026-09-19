@@ -1,59 +1,61 @@
-# MCP BSL Platform Help Context — configuration file
-# Copy to config.yml and adjust for your environment.
-# All settings can be overridden via env vars (MCP_BSL_*) or CLI arguments.
+# MCP BSL Platform Help Context — файл конфигурации
+# Скопируйте в config.yml и настройте под своё окружение.
+# Все параметры можно переопределить через переменные окружения (MCP_BSL_*) или CLI-аргументы.
 
 server:
-  mode: streamable-http       # stdio | sse | streamable-http
-  port: 8080
-  verbose: false
+  mode: streamable-http        # stdio | sse | streamable-http
+  port: 8080                   # порт для HTTP-транспортов
+  verbose: false               # подробное отладочное логирование
 
 platform:
-  # Path to 1C platform installation directory.
-  # Can point to a specific version dir (8.3.25.1257/) or a parent with multiple versions.
+  # Путь к каталогу установки платформы 1С.
+  # Можно указать каталог конкретной версии (8.3.25.1257/) или родительский с несколькими версиями.
   # Linux:   /opt/1cv8/x86_64
   # Windows: C:/Program Files/1cv8
   path: "C:/Program Files/1cv8"
 
-  # Preferred platform version. null = auto-select latest available.
-  # If the exact version is not available, the closest match is used.
+  # Предпочтительная версия платформы. null = авто-выбор последней доступной.
+  # Если точной версии нет — будет использована ближайшая.
   version: null
 
   data_source: hbk             # hbk | json
-  json_path: null              # required when data_source=json
+  json_path: null              # обязателен при data_source=json
 
 search:
   default_mode: hybrid         # hybrid | semantic | keyword
 
-# Embedding model for semantic search
+# Модель эмбеддингов для семантического поиска
 embeddings:
   provider: local              # local | openai-compatible
   model: ai-forever/ru-en-RoSBERTa
 
-  # For API providers (OpenRouter, LM Studio, etc.):
+  # Для API-провайдеров (OpenRouter, LM Studio и др.):
   # api_url: http://localhost:1234/v1
   # api_key: your-api-key
   api_url: null
   api_key: null
 
-# Cross-encoder reranker
+# Кросс-энкодер-реранкер
 reranker:
-  enabled: true
+  enabled: true                # применить реранкинг результатов
   provider: local              # local | openai-compatible
   model: DiTy/cross-encoder-russian-msmarco
   api_url: null
   api_key: null
 
-# Persistent storage paths (mounted as volumes in Docker)
+# Пути к постоянным данным (монтируются как тома в Docker)
 storage:
-  qdrant_path: ./data/qdrant   # Qdrant vector database
-  models_cache: ./data/models  # Downloaded model files
+  qdrant_path: ./data/qdrant   # векторная база Qdrant (эмбеддинги)
+  models_cache: ./data/models  # скачанные файлы моделей
 
-# Index management
+# Управление индексом
 index:
-  reindex: false               # true = rebuild embeddings index on startup
-  reset_cache: false           # true = re-download models on startup
+  reindex: false               # true = пересобрать индекс эмбеддингов при запуске.
+                               # Также задаётся через env MCP_BSL_INDEX_REINDEX
+                               # или CLI-флаг: mcp-bsl-context --reindex
+  reset_cache: false           # true = заново скачать модели при запуске
 
-# Documentation files (optional — bundled defaults are used when not set)
+# Файлы документации (необязательно — используются встроенные по умолчанию)
 docs:
-  strict_types_path: null      # Custom path to strict-types.md
-  guideline_path: null         # Custom path to guideline.md
+  strict_types_path: null      # Кастомный путь к strict-types.md
+  guideline_path: null         # Кастомный путь к guideline.md
