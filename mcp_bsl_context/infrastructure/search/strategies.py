@@ -11,6 +11,7 @@ from mcp_bsl_context.domain.entities import (
     MethodDefinition,
     PlatformTypeDefinition,
     PropertyDefinition,
+    definition_key,
 )
 from mcp_bsl_context.domain.enums import ApiType
 
@@ -23,6 +24,7 @@ class SearchResult:
     item: Definition
     priority: int
     words_matched: int = 0
+    type_name: str = ""
 
 
 def _split_words(text: str) -> list[str]:
@@ -60,13 +62,13 @@ class CompoundTypeSearch:
             return []
 
         results: list[SearchResult] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str, str]] = set()
 
         # Generate compound variants
         variants = self._generate_variants(words)
         for variant, word_count in variants:
             for item in prefix_indexes.types.get(variant):
-                key = item.name.lower()
+                key = definition_key(item)
                 if key not in seen:
                     seen.add(key)
                     results.append(SearchResult(item, self.priority, word_count))
@@ -104,8 +106,11 @@ class TypeMemberSearch:
         if len(words) < 2:
             return []
 
+        if api_type is not None and api_type not in (ApiType.METHOD, ApiType.PROPERTY):
+            return []
+
         results: list[SearchResult] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str, str]] = set()
 
         # Try splitting at each position: words[:i] as type, words[i:] as member
         for split_pos in range(1, len(words)):
@@ -121,17 +126,29 @@ class TypeMemberSearch:
                     continue
                 member_lower = member_name.lower()
                 for method in type_def.methods:
+                    if api_type is not None and api_type != ApiType.METHOD:
+                        continue
                     if method.name.lower().startswith(member_lower):
-                        key = f"{type_def.name}.{method.name}".lower()
+                        key = definition_key(method, type_def.name)
                         if key not in seen:
                             seen.add(key)
-                            results.append(SearchResult(method, self.priority, split_pos + 1))
+                            results.append(
+                                SearchResult(
+                                    method, self.priority, split_pos + 1, type_def.name
+                                )
+                            )
                 for prop in type_def.properties:
+                    if api_type is not None and api_type != ApiType.PROPERTY:
+                        continue
                     if prop.name.lower().startswith(member_lower):
-                        key = f"{type_def.name}.{prop.name}".lower()
+                        key = definition_key(prop, type_def.name)
                         if key not in seen:
                             seen.add(key)
-                            results.append(SearchResult(prop, self.priority, split_pos + 1))
+                            results.append(
+                                SearchResult(
+                                    prop, self.priority, split_pos + 1, type_def.name
+                                )
+                            )
 
         return results
 
@@ -149,12 +166,12 @@ class RegularSearch:
         api_type: ApiType | None,
     ) -> list[SearchResult]:
         results: list[SearchResult] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str, str]] = set()
         q = query.strip()
 
         def _add(items: list, priority: int = self.priority) -> None:
             for item in items:
-                key = item.name.lower()
+                key = definition_key(item)
                 if key not in seen:
                     seen.add(key)
                     results.append(SearchResult(item, priority))
@@ -185,29 +202,48 @@ class WordOrderSearch:
         all_methods: list[MethodDefinition],
         all_properties: list[PropertyDefinition],
         all_types: list[PlatformTypeDefinition],
-        api_type: ApiType | None,
+        all_members: list[Definition] | None = None,
+        member_owner: dict[int, str] | None = None,
+        api_type: ApiType | None = None,
     ) -> list[SearchResult]:
         words = _split_words(query)
         if not words:
             return []
 
+        owner = member_owner or {}
         results: list[SearchResult] = []
-        seen: set[str] = set()
+        seen: set[tuple[str, str, str]] = set()
 
-        def _check(items: list, expected_type: ApiType | None = None) -> None:
+        def _include(
+            item: Definition,
+            expected_type: ApiType | None = None,
+            type_name: str = "",
+        ) -> None:
             if api_type is not None and expected_type is not None and api_type != expected_type:
                 return
-            for item in items:
-                name_lower = item.name.lower()
-                matched = sum(1 for w in words if w in name_lower)
-                if matched > 0:
-                    key = name_lower
-                    if key not in seen:
-                        seen.add(key)
-                        results.append(SearchResult(item, self.priority, matched))
+            name_lower = item.name.lower()
+            matched = sum(1 for w in words if w in name_lower)
+            if matched > 0:
+                effective_owner = owner.get(id(item), type_name)
+                key = definition_key(item, effective_owner)
+                if key not in seen:
+                    seen.add(key)
+                    results.append(
+                        SearchResult(item, self.priority, matched, effective_owner)
+                    )
 
-        _check(all_methods, ApiType.METHOD)
-        _check(all_properties, ApiType.PROPERTY)
-        _check(all_types, ApiType.TYPE)
+        for method in all_methods:
+            _include(method, ApiType.METHOD)
+        for prop in all_properties:
+            _include(prop, ApiType.PROPERTY)
+        for type_def in all_types:
+            _include(type_def, ApiType.TYPE)
+
+        if all_members:
+            for item in all_members:
+                if isinstance(item, MethodDefinition):
+                    _include(item, ApiType.METHOD)
+                elif isinstance(item, PropertyDefinition):
+                    _include(item, ApiType.PROPERTY)
 
         return results

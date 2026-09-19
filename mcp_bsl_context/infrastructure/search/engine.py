@@ -11,6 +11,7 @@ from mcp_bsl_context.domain.entities import (
     MethodDefinition,
     PlatformTypeDefinition,
     PropertyDefinition,
+    definition_key,
 )
 from mcp_bsl_context.domain.value_objects import SearchQuery
 
@@ -121,15 +122,18 @@ class SimpleSearchEngine:
                 self._storage.methods,
                 self._storage.properties,
                 self._storage.types,
+                self._storage.members,
+                self._storage.member_owner,
                 query.type,
             )
         )
 
-        # Deduplicate
-        seen: set[str] = set()
+        # Deduplicate with a type-aware key so members of different types
+        # with the same name are never collapsed into one result.
+        seen: set[tuple[str, str, str]] = set()
         unique: list[SearchResult] = []
         for r in all_results:
-            key = r.item.name.lower()
+            key = definition_key(r.item, r.type_name)
             if key not in seen:
                 seen.add(key)
                 unique.append(r)

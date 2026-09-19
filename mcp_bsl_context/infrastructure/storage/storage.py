@@ -7,6 +7,7 @@ import threading
 from pathlib import Path
 
 from mcp_bsl_context.domain.entities import (
+    Definition,
     MethodDefinition,
     PlatformTypeDefinition,
     PropertyDefinition,
@@ -18,6 +19,26 @@ from .mapper import method_info_to_entity, object_info_to_entity, property_info_
 logger = logging.getLogger(__name__)
 
 
+def build_member_index(
+    types: list[PlatformTypeDefinition],
+) -> tuple[list[Definition], dict[int, str]]:
+    """Flatten type members into a searchable list with owner-type mapping.
+
+    Returns ``(members, member_owner)`` where ``member_owner`` maps the
+    ``id()`` of each member definition to its owning platform type name.
+    """
+    members: list[Definition] = []
+    member_owner: dict[int, str] = {}
+    for type_def in types:
+        for method in type_def.methods:
+            members.append(method)
+            member_owner[id(method)] = type_def.name
+        for prop in type_def.properties:
+            members.append(prop)
+            member_owner[id(prop)] = type_def.name
+    return members, member_owner
+
+
 class PlatformContextStorage:
     """Thread-safe lazy-loading storage for platform context data."""
 
@@ -27,6 +48,8 @@ class PlatformContextStorage:
         self.methods: list[MethodDefinition] = []
         self.properties: list[PropertyDefinition] = []
         self.types: list[PlatformTypeDefinition] = []
+        self.members: list[Definition] = []
+        self.member_owner: dict[int, str] = {}
         self._loaded = False
         self._lock = threading.RLock()
 
@@ -48,12 +71,7 @@ class PlatformContextStorage:
         self.methods = [method_info_to_entity(m) for m in context.global_methods]
         self.properties = [property_info_to_entity(p) for p in context.global_properties]
         self.types = [object_info_to_entity(t) for t in context.types]
-
-        # Add methods from types to global methods list for search
-        for type_def in self.types:
-            # Types themselves are searchable, their members are accessed via type
-
-            pass
+        self.members, self.member_owner = build_member_index(self.types)
 
         logger.info(
             "Platform context loaded: %d methods, %d properties, %d types",

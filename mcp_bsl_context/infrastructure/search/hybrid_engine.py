@@ -5,7 +5,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from mcp_bsl_context.domain.entities import Definition
+from mcp_bsl_context.domain.entities import (
+    Definition,
+    definition_key,
+)
 from mcp_bsl_context.domain.value_objects import SearchQuery
 from mcp_bsl_context.infrastructure.embeddings.document_builder import DocumentBuilder
 from mcp_bsl_context.infrastructure.embeddings.reranker import Reranker
@@ -78,7 +81,9 @@ class HybridSearchEngine:
         )
 
         # 3. RRF merge
-        merged = self._rrf_merge(keyword_results, semantic_results)
+        merged = self._rrf_merge(
+            keyword_results, semantic_results, member_owner=storage.member_owner
+        )
 
         # 4. Optional rerank
         if self._reranker and len(merged) > 1:
@@ -93,23 +98,26 @@ class HybridSearchEngine:
     def _rrf_merge(
         list_a: list[Definition],
         list_b: list[Definition],
+        member_owner: dict[int, str] | None = None,
     ) -> list[Definition]:
         """Merge two ranked lists using Reciprocal Rank Fusion.
 
         Each document receives score = Σ 1/(RRF_K + rank) from each list
         where it appears.  Results are sorted by fused score descending
-        and deduplicated by element name.
+        and deduplicated by a type-aware key, so members of different
+        types with the same name are never collapsed.
         """
-        scores: dict[str, float] = {}
-        items: dict[str, Definition] = {}
+        owner = member_owner or {}
+        scores: dict[tuple[str, str, str], float] = {}
+        items: dict[tuple[str, str, str], Definition] = {}
 
         for rank, defn in enumerate(list_a):
-            key = _definition_key(defn)
+            key = _definition_key(defn, owner)
             scores[key] = scores.get(key, 0.0) + 1.0 / (RRF_K + rank + 1)
             items.setdefault(key, defn)
 
         for rank, defn in enumerate(list_b):
-            key = _definition_key(defn)
+            key = _definition_key(defn, owner)
             scores[key] = scores.get(key, 0.0) + 1.0 / (RRF_K + rank + 1)
             items.setdefault(key, defn)
 
@@ -118,7 +126,10 @@ class HybridSearchEngine:
         return [items[k] for k in sorted_keys]
 
 
-def _definition_key(defn: Definition) -> str:
-    """Unique key for deduplication based on definition type and name."""
-    type_prefix = type(defn).__name__
-    return f"{type_prefix}:{defn.name}"
+def _definition_key(
+    defn: Definition,
+    member_owner: dict[int, str] | None = None,
+) -> tuple[str, str, str]:
+    """Type-aware dedup key: resolves the owner type for type members."""
+    owner = member_owner or {}
+    return definition_key(defn, owner.get(id(defn), ""))

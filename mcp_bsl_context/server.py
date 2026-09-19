@@ -490,11 +490,14 @@ def _create_json_storage(json_path: str) -> PlatformContextStorage:
     json_loader = JsonContextLoader()
     methods, properties, types = json_loader.load_all(Path(json_path))
 
+    from mcp_bsl_context.infrastructure.storage.storage import build_member_index
+
     # Create a dummy storage and populate it directly
     storage = PlatformContextStorage.__new__(PlatformContextStorage)
     storage.methods = methods
     storage.properties = properties
     storage.types = types
+    storage.members, storage.member_owner = build_member_index(types)
     storage._loaded = True
     storage._lock = __import__("threading").RLock()
     return storage

@@ -25,6 +25,8 @@ class FakeStorage:
         self.methods = methods
         self.properties = properties
         self.types = types
+        self.members = []
+        self.member_owner = {}
         self._loaded = True
         self._lock = threading.RLock()
 
@@ -34,6 +36,9 @@ class FakeStorage:
 
 def _make_service(methods=None, properties=None, types=None):
     storage = FakeStorage(methods or [], properties or [], types or [])
+    from mcp_bsl_context.infrastructure.storage.storage import build_member_index
+
+    storage.members, storage.member_owner = build_member_index(storage.types)
     engine = SimpleSearchEngine(storage)
     repo = PlatformRepository(engine)
     return ContextSearchService(repo)

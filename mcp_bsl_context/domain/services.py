@@ -84,17 +84,14 @@ class ContextSearchService:
         if type_def is None:
             raise PlatformTypeNotFoundException(f"Type '{type_name}' not found")
 
-        member_lower = member_name.strip().lower()
-        for method in type_def.methods:
-            if method.name.lower() == member_lower:
-                return method
-        for prop in type_def.properties:
-            if prop.name.lower() == member_lower:
-                return prop
-
-        raise TypeMemberNotFoundException(
-            f"Member '{member_name}' not found in type '{type_name}'"
+        member = self._repository.find_type_member(
+            type_name.strip(), member_name.strip()
         )
+        if member is None:
+            raise TypeMemberNotFoundException(
+                f"Member '{member_name}' not found in type '{type_name}'"
+            )
+        return member
 
     def find_type_members(self, type_name: str) -> list[Definition]:
         if not type_name or not type_name.strip():

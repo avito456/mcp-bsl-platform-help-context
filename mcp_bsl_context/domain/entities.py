@@ -54,3 +54,23 @@ class PlatformTypeDefinition:
 
 
 Definition = Union[MethodDefinition, PropertyDefinition, PlatformTypeDefinition]
+
+
+def definition_api_type(defn: Definition) -> str:
+    """Return the API type string for a definition."""
+    if isinstance(defn, MethodDefinition):
+        return "method"
+    if isinstance(defn, PropertyDefinition):
+        return "property"
+    return "type"
+
+
+def definition_key(defn: Definition, type_name: str = "") -> tuple[str, str, str]:
+    """Unified dedup key: (api_type, owner_type_name, name), all lowercased.
+
+    ``type_name`` is the owning platform type for type members (empty for
+    global methods/properties and types themselves).  Two members with the
+    same name but different owners produce different keys and are never
+    collapsed during deduplication.
+    """
+    return (definition_api_type(defn), (type_name or "").lower(), defn.name.lower())

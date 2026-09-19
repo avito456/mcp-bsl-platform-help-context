@@ -123,7 +123,7 @@ class SemanticSearchEngine:
             for ranked in reranked:
                 payload = results[ranked.index].payload
                 defn = self._resolve_definition(payload)
-                if defn is not None and defn not in definitions:
+                if defn is not None and not any(d is defn for d in definitions):
                     definitions.append(defn)
             return definitions[:limit]
 
@@ -131,7 +131,7 @@ class SemanticSearchEngine:
         definitions: list[Definition] = []
         for hit in results[:limit]:
             defn = self._resolve_definition(hit.payload)
-            if defn is not None and defn not in definitions:
+            if defn is not None and not any(d is defn for d in definitions):
                 definitions.append(defn)
         return definitions
 

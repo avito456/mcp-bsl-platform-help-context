@@ -17,15 +17,29 @@ from mcp_bsl_context.infrastructure.search.hybrid_engine import (
 class TestDefinitionKey:
     def test_method_key(self):
         m = MethodDefinition(name="Тест", description="")
-        assert _definition_key(m) == "MethodDefinition:Тест"
+        assert _definition_key(m) == ("method", "", "тест")
 
     def test_property_key(self):
         p = PropertyDefinition(name="Свойство", description="")
-        assert _definition_key(p) == "PropertyDefinition:Свойство"
+        assert _definition_key(p) == ("property", "", "свойство")
 
     def test_type_key(self):
         t = PlatformTypeDefinition(name="МойТип", description="")
-        assert _definition_key(t) == "PlatformTypeDefinition:МойТип"
+        assert _definition_key(t) == ("type", "", "мойтип")
+
+    def test_member_key_includes_owner(self):
+        owner = PlatformTypeDefinition(
+            name="ТаблицаЗначений",
+            description="",
+            methods=[MethodDefinition(name="Добавить", description="")],
+        )
+        member = owner.methods[0]
+        member_owner = {id(member): owner.name}
+        assert _definition_key(member, member_owner) == (
+            "method",
+            "таблицазначений",
+            "добавить",
+        )
 
 
 class TestRRFMerge:
@@ -109,3 +123,27 @@ class TestRRFMerge:
 
         result = HybridSearchEngine._rrf_merge([m], [p])
         assert len(result) == 2
+
+    def test_members_of_different_types_not_deduplicated(self):
+        """Same-name members of different types must both survive RRF."""
+        owner_a = PlatformTypeDefinition(
+            name="Массив", description="", methods=[MethodDefinition(name="Добавить", description="a")]
+        )
+        owner_b = PlatformTypeDefinition(
+            name="ТаблицаЗначений",
+            description="",
+            methods=[MethodDefinition(name="Добавить", description="b")],
+        )
+        member_a = owner_a.methods[0]
+        member_b = owner_b.methods[0]
+        member_owner = {id(member_a): owner_a.name, id(member_b): owner_b.name}
+
+        result = HybridSearchEngine._rrf_merge([member_a], [member_b], member_owner)
+        assert len(result) == 2
+
+    def test_same_member_in_both_lists_deduplicated(self):
+        m = MethodDefinition(name="Общий", description="")
+        member_owner = {id(m): "Тип"}
+
+        result = HybridSearchEngine._rrf_merge([m], [m], member_owner)
+        assert len(result) == 1

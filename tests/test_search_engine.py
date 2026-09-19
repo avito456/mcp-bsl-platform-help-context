@@ -19,6 +19,8 @@ class FakeStorage:
         self.methods = methods
         self.properties = properties
         self.types = types
+        self.members = []
+        self.member_owner = {}
         self._loaded = True
         self._lock = threading.RLock()
 
@@ -33,6 +35,9 @@ class TestSimpleSearchEngine:
             properties=properties or [],
             types=types or [],
         )
+        from mcp_bsl_context.infrastructure.storage.storage import build_member_index
+
+        storage.members, storage.member_owner = build_member_index(storage.types)
         return SimpleSearchEngine(storage)
 
     def test_search_methods_by_prefix(self, sample_methods):
@@ -113,3 +118,32 @@ class TestSimpleSearchEngine:
         results = engine.search(SearchQuery(query="Ссылке"))
         names = [r.name for r in results]
         assert "НайтиПоСсылке" in names
+
+    def test_single_word_member_search(self, sample_types):
+        """C3: one-word queries find members of types (e.g. 'Добавить')."""
+        engine = self._make_engine(types=sample_types)
+        results = engine.search(SearchQuery(query="Добавить"))
+        names = [r.name for r in results]
+        assert names.count("Добавить") >= 2  # ТаблицаЗначений + Массив
+
+    def test_members_of_different_types_not_collapsed(self, sample_types):
+        """C1: dedup must not collapse same-name members of different types."""
+        engine = self._make_engine(types=sample_types)
+        results = engine.search(SearchQuery(query="Добавить"))
+        add_members = [r for r in results if r.name == "Добавить"]
+        assert len(add_members) >= 2
+
+    def test_type_member_search_honors_api_type_filter(self, sample_types):
+        """C2: TypeMemberSearch must respect the api_type filter."""
+        engine = self._make_engine(types=sample_types)
+        results = engine.search(
+            SearchQuery(query="ТаблицаЗначений Добавить", type=ApiType.PROPERTY)
+        )
+        assert results == []
+
+        results = engine.search(
+            SearchQuery(query="ТаблицаЗначений Добавить", type=ApiType.METHOD)
+        )
+        names = [r.name for r in results]
+        assert names
+        assert all(r.name == "Добавить" for r in results)  # только методы, никаких свойств
