@@ -25,25 +25,33 @@ class MarkdownFormatter:
     def format_query(self, query: str) -> str:
         return f"**Search:** `{query}`\n\n"
 
-    def format_search_results(self, results: list[Definition]) -> str:
+    def format_search_results(
+        self,
+        results: list[Definition],
+        member_owner: dict[int, str] | None = None,
+    ) -> str:
         if not results:
             return "Nothing found.\n"
 
+        owner = member_owner or {}
+
         if len(results) == 1:
-            return self.format_member(results[0])
+            return self.format_member(results[0], owner.get(id(results[0]), ""))
 
         if len(results) <= 5:
-            return self._format_compact_results(results)
+            return self._format_compact_results(results, owner)
 
-        return self._format_table_results(results)
+        return self._format_table_results(results, owner)
 
-    def format_member(self, definition: Definition) -> str:
+    def format_member(
+        self, definition: Definition, owner_type: str = ""
+    ) -> str:
         if isinstance(definition, PlatformTypeDefinition):
             return self._format_type(definition)
         if isinstance(definition, MethodDefinition):
-            return self._format_method(definition)
+            return self._format_method(definition, owner_type)
         if isinstance(definition, PropertyDefinition):
-            return self._format_property(definition)
+            return self._format_property(definition, owner_type)
         return f"**{self._escape_inline(definition.name)}**\n{definition.description}\n"
 
     def format_type_members(
@@ -154,8 +162,14 @@ class MarkdownFormatter:
 
         return "\n".join(parts)
 
-    def _format_method(self, method: MethodDefinition) -> str:
-        parts: list[str] = [f"## {self._escape_inline(method.name)}\n"]
+    def _format_method(self, method: MethodDefinition, owner_type: str = "") -> str:
+        heading = (
+            f"{owner_type}.{method.name}" if owner_type else method.name
+        )
+        parts: list[str] = [f"## {self._escape_inline(heading)}\n"]
+
+        if owner_type:
+            parts.append(f"**Тип-владелец:** `{self._escape_inline(owner_type)}`\n")
 
         if method.signatures:
             for sig in method.signatures:
@@ -179,8 +193,12 @@ class MarkdownFormatter:
 
         return "\n".join(parts)
 
-    def _format_property(self, prop: PropertyDefinition) -> str:
-        parts: list[str] = [f"## {self._escape_inline(prop.name)}\n"]
+    def _format_property(self, prop: PropertyDefinition, owner_type: str = "") -> str:
+        heading = f"{owner_type}.{prop.name}" if owner_type else prop.name
+        parts: list[str] = [f"## {self._escape_inline(heading)}\n"]
+
+        if owner_type:
+            parts.append(f"**Тип-владелец:** `{self._escape_inline(owner_type)}`\n")
 
         if prop.property_type:
             parts.append(f"**Type:** `{prop.property_type}`\n")
@@ -194,23 +212,35 @@ class MarkdownFormatter:
 
         return "\n".join(parts)
 
-    def _format_compact_results(self, results: list[Definition]) -> str:
+    def _format_compact_results(
+        self,
+        results: list[Definition],
+        member_owner: dict[int, str],
+    ) -> str:
         parts: list[str] = [f"Found {len(results)} results:\n"]
 
         for item in results:
             kind = _get_kind_label(item)
+            owner = member_owner.get(id(item), "")
+            display = f"{owner}.{item.name}" if owner else item.name
             desc = self._truncate(item.description, 80) if item.description else ""
             parts.append(
-                f"- **{self._escape_inline(item.name)}** ({kind}) — {desc}"
+                f"- **{self._escape_inline(display)}** ({kind}) — {desc}"
             )
 
         parts.append("")
         # Show details for the first result
         parts.append("---\n")
-        parts.append(self.format_member(results[0]))
+        parts.append(
+            self.format_member(results[0], member_owner.get(id(results[0]), ""))
+        )
         return "\n".join(parts)
 
-    def _format_table_results(self, results: list[Definition]) -> str:
+    def _format_table_results(
+        self,
+        results: list[Definition],
+        member_owner: dict[int, str],
+    ) -> str:
         top5 = results[:5]
         parts: list[str] = [
             f"Found {len(results)} results (showing top 5):\n",
@@ -220,14 +250,18 @@ class MarkdownFormatter:
 
         for i, item in enumerate(top5, 1):
             kind = _get_kind_label(item)
+            owner = member_owner.get(id(item), "")
+            display = f"{owner}.{item.name}" if owner else item.name
             parts.append(
-                f"| {i} | **{self._escape_inline(item.name)}** | {kind} |"
+                f"| {i} | **{self._escape_inline(display)}** | {kind} |"
             )
 
         parts.append("")
         # Show details for the first result
         parts.append("---\n")
-        parts.append(self.format_member(results[0]))
+        parts.append(
+            self.format_member(results[0], member_owner.get(id(results[0]), ""))
+        )
         return "\n".join(parts)
 
     @staticmethod

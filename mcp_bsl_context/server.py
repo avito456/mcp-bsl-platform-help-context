@@ -326,7 +326,9 @@ def create_server(config: AppConfig):
             )
         return (
             formatter.format_query(query)
-            + formatter.format_search_results(results)
+            + formatter.format_search_results(
+                results, member_owner=storage.member_owner
+            )
         )
 
     @mcp.tool()
@@ -354,7 +356,7 @@ def create_server(config: AppConfig):
             member_name: Имя метода или свойства внутри типа (например, 'Добавить', 'Количество')
         """
         definition = service.find_member_by_type_and_name(type_name, member_name)
-        return formatter.format_member(definition)
+        return formatter.format_member(definition, type_name)
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)
