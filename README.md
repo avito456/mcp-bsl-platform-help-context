@@ -65,19 +65,18 @@ Python-порт [mcp-bsl-platform-context](https://github.com/alkoleft/mcp-bsl-p
 
 ## Установка
 
-```bash
-pip install -e .                # Базовая установка (keyword search)
-pip install -e ".[dev]"         # + pytest для разработки
-pip install -e ".[local]"       # + sentence-transformers, torch (semantic/hybrid search)
-```
-
-Через [uv](https://docs.astral.sh/uv/):
+Рекомендуется [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv sync                       # Базовая установка (keyword search)
-uv sync --extra local --extra dev   # + локальные ML-модели и dev (pytest)
-uv run mcp-bsl-context -c config.yml
+# В корне проекта:
+uv sync                                   # Базовая установка (keyword search)
+uv sync --extra local                     # + sentence-transformers, torch (semantic/hybrid search)
+uv sync --extra local --extra dev         # + pytest для разработки
+
+uv run mcp-bsl-context -c config.yml      # Запуск
 ```
+
+Приведённые ниже примеры используют `mcp-bsl-context`; внутри каталога проекта это эквивалентно `uv run mcp-bsl-context`.
 
 ### Зависимости
 
@@ -162,8 +161,8 @@ mcp-bsl-context -p /path --reindex                              # Пересбо
 {
   "mcpServers": {
     "bsl-context": {
-      "command": "python",
-      "args": ["-m", "mcp_bsl_context", "-p", "/opt/1cv8/x86_64/8.3.25.1257"]
+      "command": "uv",
+      "args": ["--project", "/path/to/mcp-bsl-platform-help-context", "run", "mcp-bsl-context", "-p", "/opt/1cv8/x86_64/8.3.25.1257"]
     }
   }
 }
@@ -177,8 +176,8 @@ mcp-bsl-context -p /path --reindex                              # Пересбо
 {
   "mcpServers": {
     "bsl-context": {
-      "command": "python",
-      "args": ["-m", "mcp_bsl_context", "-p", "C:\\Program Files\\1cv8\\8.3.25.1257"]
+      "command": "uv",
+      "args": ["--project", "C:\\path\\to\\mcp-bsl-platform-help-context", "run", "mcp-bsl-context", "-p", "C:\\Program Files\\1cv8\\8.3.25.1257"]
     }
   }
 }
@@ -362,10 +361,10 @@ mcp_bsl_context/
 ## Тестирование
 
 ```bash
-pip install -e ".[dev]"
-pytest -v                     # Все тесты (306)
-pytest -v tests/test_search_engine.py           # Один модуль
-pytest -v tests/test_search_engine.py::test_name  # Один тест
+uv sync --extra dev
+uv run pytest -v                     # Все тесты
+uv run pytest -v tests/test_search_engine.py           # Один модуль
+uv run pytest -v tests/test_search_engine.py::test_name  # Один тест
 ```
 
 ## Источник данных
