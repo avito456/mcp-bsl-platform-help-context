@@ -56,6 +56,7 @@ namespaces = false
 
 [tool.setuptools.package-data]
 "mcp_bsl_context.docinfo" = ["*.md"]
+"mcp_bsl_context.installer_templates" = ["*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
