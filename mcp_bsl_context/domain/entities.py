@@ -27,6 +27,7 @@ class MethodDefinition:
     name: str
     description: str
     return_type: str = ""
+    name_en: str = ""
     signatures: list[Signature] = field(default_factory=list)
 
 
@@ -36,12 +37,14 @@ class PropertyDefinition:
     description: str
     property_type: str = ""
     is_read_only: bool = False
+    name_en: str = ""
 
 
 @dataclass(frozen=True)
 class PlatformTypeDefinition:
     name: str
     description: str
+    name_en: str = ""
     methods: list[MethodDefinition] = field(default_factory=list)
     properties: list[PropertyDefinition] = field(default_factory=list)
     constructors: list[Signature] = field(default_factory=list)
@@ -63,6 +66,20 @@ def definition_api_type(defn: Definition) -> str:
     if isinstance(defn, PropertyDefinition):
         return "property"
     return "type"
+
+
+def definition_names(defn: Definition) -> list[str]:
+    """Return all lookup names of a definition (RU + EN aliases).
+
+    The primary name is first; the English alias follows when present
+    and different from the primary.  Used to build search indexes so
+    queries in either language resolve to the same entity.
+    """
+    aliases = [defn.name]
+    name_en = getattr(defn, "name_en", "") or ""
+    if name_en and name_en != defn.name:
+        aliases.append(name_en)
+    return aliases
 
 
 def definition_key(defn: Definition, type_name: str = "") -> tuple[str, str, str]:

@@ -89,6 +89,7 @@ class JsonContextLoader:
     def _parse_method(self, data: dict) -> MethodDefinition:
         return MethodDefinition(
             name=data.get("name", data.get("name_ru", "")),
+            name_en=data.get("name_en", ""),
             description=data.get("description", ""),
             return_type=data.get("return_type", data.get("returnType", "")),
             signatures=[self._parse_signature(s) for s in data.get("signatures", [])],
@@ -97,6 +98,7 @@ class JsonContextLoader:
     def _parse_property(self, data: dict) -> PropertyDefinition:
         return PropertyDefinition(
             name=data.get("name", data.get("name_ru", "")),
+            name_en=data.get("name_en", ""),
             description=data.get("description", ""),
             property_type=data.get("property_type", data.get("type", "")),
             is_read_only=data.get("is_read_only", data.get("readOnly", False)),
@@ -105,6 +107,7 @@ class JsonContextLoader:
     def _parse_type(self, data: dict) -> PlatformTypeDefinition:
         return PlatformTypeDefinition(
             name=data.get("name", data.get("name_ru", "")),
+            name_en=data.get("name_en", ""),
             description=data.get("description", ""),
             methods=[self._parse_method(m) for m in data.get("methods", [])],
             properties=[self._parse_property(p) for p in data.get("properties", [])],

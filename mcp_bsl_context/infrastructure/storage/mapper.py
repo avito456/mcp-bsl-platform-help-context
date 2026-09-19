@@ -21,6 +21,7 @@ from mcp_bsl_context.infrastructure.hbk.models import (
 def method_info_to_entity(info: MethodInfo) -> MethodDefinition:
     return MethodDefinition(
         name=info.name_ru or info.name_en,
+        name_en=info.name_en or "",
         description=info.description,
         return_type=info.return_value.type if info.return_value else "",
         signatures=[signature_info_to_entity(s) for s in info.signatures],
@@ -30,6 +31,7 @@ def method_info_to_entity(info: MethodInfo) -> MethodDefinition:
 def property_info_to_entity(info: PropertyInfo) -> PropertyDefinition:
     return PropertyDefinition(
         name=info.name_ru or info.name_en,
+        name_en=info.name_en or "",
         description=info.description,
         property_type=info.property_type,
         is_read_only=info.is_read_only,
@@ -39,6 +41,7 @@ def property_info_to_entity(info: PropertyInfo) -> PropertyDefinition:
 def object_info_to_entity(info: ObjectInfo) -> PlatformTypeDefinition:
     return PlatformTypeDefinition(
         name=info.name_ru or info.name_en,
+        name_en=info.name_en or "",
         description=info.description,
         methods=[method_info_to_entity(m) for m in info.methods],
         properties=[property_info_to_entity(p) for p in info.properties],
