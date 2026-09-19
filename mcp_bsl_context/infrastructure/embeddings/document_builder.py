@@ -168,15 +168,17 @@ class DocumentBuilder:
         }
         return EmbeddingDocument(id=doc_id, text=text, metadata=metadata)
 
-    def build_text(self, definition: Definition) -> str:
+    def build_text(self, definition: Definition, type_name: str | None = None) -> str:
         """Build embeddable text from a Definition (useful for reranking).
 
-        Does not need type context — produces text with the element name only.
+        When ``type_name`` is provided (a type member), the text matches the
+        indexed document format — e.g. "ТаблицаЗначений.Добавить" instead of
+        just "Добавить" — so reranking sees the same surface as the index.
         """
         if isinstance(definition, MethodDefinition):
-            return self.build_from_method(definition).text
+            return self.build_from_method(definition, type_name=type_name).text
         if isinstance(definition, PropertyDefinition):
-            return self.build_from_property(definition).text
+            return self.build_from_property(definition, type_name=type_name).text
         if isinstance(definition, PlatformTypeDefinition):
             return self.build_from_type(definition).text
         return str(definition)

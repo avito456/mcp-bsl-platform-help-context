@@ -119,6 +119,27 @@ class TestSimpleSearchEngine:
         names = [r.name for r in results]
         assert "НайтиПоСсылке" in names
 
+    def test_partial_word_falls_back_to_substring(self, sample_methods):
+        """Non-token (partial/suffix) queries still match via substring scan."""
+        engine = self._make_engine(methods=sample_methods)
+        results = engine.search(SearchQuery(query="ПоСс"))
+        names = [r.name for r in results]
+        assert "НайтиПоСсылке" in names
+
+    def test_word_split_handles_yo(self, sample_methods):
+        """Query words containing 'ё' are split and matched ('Жёсткий')."""
+        engine = self._make_engine(
+            methods=[MethodDefinition(name="ЖёсткийДиск", description="")],
+            types=[
+                PlatformTypeDefinition(
+                    name="ТипТест", description="", methods=[], properties=[]
+                )
+            ],
+        )
+        results = engine.search(SearchQuery(query="Жёсткий"))
+        names = [r.name for r in results]
+        assert "ЖёсткийДиск" in names
+
     def test_single_word_member_search(self, sample_types):
         """C3: one-word queries find members of types (e.g. 'Добавить')."""
         engine = self._make_engine(types=sample_types)

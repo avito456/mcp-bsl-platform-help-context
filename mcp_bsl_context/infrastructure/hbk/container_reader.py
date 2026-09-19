@@ -9,6 +9,7 @@ The HBK file format is a proprietary 1C binary container with:
 from __future__ import annotations
 
 import logging
+import mmap
 import struct
 from pathlib import Path
 
@@ -19,12 +20,17 @@ class HbkContainerReader:
     """Reads the binary container structure of an HBK file."""
 
     def read(self, path: Path) -> dict[str, bytes]:
-        """Read an HBK file and return a dict of filename -> body bytes."""
-        data = path.read_bytes()
-        entities = self._parse_file_info(data)
-        result: dict[str, bytes] = {}
-        for name, body_addr in entities.items():
-            result[name] = self._get_file_body(data, body_addr)
+        """Read an HBK file and return a dict of filename -> body bytes.
+
+        The container is memory-mapped: only the pages actually touched are
+        brought into RAM, instead of loading the whole file (tens of MB) at once.
+        """
+        with path.open("rb") as f:
+            with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as data:
+                entities = self._parse_file_info(data)
+                result: dict[str, bytes] = {}
+                for name, body_addr in entities.items():
+                    result[name] = self._get_file_body(data, body_addr)
         logger.debug("HBK container: found %d files: %s", len(result), list(result.keys()))
         return result
 

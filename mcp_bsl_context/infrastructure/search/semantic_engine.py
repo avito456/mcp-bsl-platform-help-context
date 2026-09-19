@@ -22,6 +22,8 @@ COLLECTION_NAME = "platform_context"
 UPSERT_BATCH_SIZE = 100
 FINGERPRINT_FILE = "index-fingerprint.json"
 _FINGERPRINT_NAMESPACE = uuid.UUID("6f45a2e7-6d1e-4b2a-9c8d-3e5f7a1b9c0d")
+# How many more candidates to fetch than requested so the reranker has room.
+SEMANTIC_FETCH_MULTIPLIER = 3
 
 
 class SemanticSearchEngine:
@@ -104,7 +106,7 @@ class SemanticSearchEngine:
         """
         self.ensure_ready(storage)
 
-        search_limit = limit * 3 if self._reranker else limit
+        search_limit = limit * SEMANTIC_FETCH_MULTIPLIER if self._reranker else limit
         query_vector = self._embedder.embed_query(query)
 
         qdrant_filter = None

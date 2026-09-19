@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 # Standard RRF constant from the original paper (Cormack et al., 2009).
 RRF_K = 60
+# How much broader the sub-searches run than the final limit.
+HYBRID_FETCH_MULTIPLIER = 3
+# How many merged candidates are fed to the reranker.
+RERANK_CANDIDATES_MULTIPLIER = 2
 
 
 class HybridSearchEngine:
@@ -66,7 +70,7 @@ class HybridSearchEngine:
             limit: Maximum results to return.
             type_filter: Optional API type filter ("method"/"property"/"type").
         """
-        fetch_limit = limit * 3
+        fetch_limit = limit * HYBRID_FETCH_MULTIPLIER
 
         # 1. Keyword search
         from mcp_bsl_context.domain.enums import ApiType
@@ -87,8 +91,13 @@ class HybridSearchEngine:
 
         # 4. Optional rerank
         if self._reranker and len(merged) > 1:
-            rerank_candidates = merged[: limit * 2]
-            texts = [self._builder.build_text(d) for d in rerank_candidates]
+            rerank_candidates = merged[: limit * RERANK_CANDIDATES_MULTIPLIER]
+            texts = [
+                self._builder.build_text(
+                    d, type_name=storage.member_owner.get(id(d), "")
+                )
+                for d in rerank_candidates
+            ]
             reranked = self._reranker.rerank(query, texts, top_k=limit)
             return [rerank_candidates[r.index] for r in reranked]
 

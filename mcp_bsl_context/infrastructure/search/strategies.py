@@ -27,6 +27,11 @@ class SearchResult:
     type_name: str = ""
 
 
+_SPLIT_RE = re.compile(
+    r"[А-ЯA-ZЁ][а-яa-zё]*|[а-яa-zё]+|[A-ZЁ]+(?=[А-ЯA-ZЁ][а-яa-zё]|\d|\b)"
+)
+
+
 def _split_words(text: str) -> list[str]:
     """Split camelCase/PascalCase and space-separated words."""
     # Split by spaces first
@@ -34,7 +39,7 @@ def _split_words(text: str) -> list[str]:
     words: list[str] = []
     for part in parts:
         # Split camelCase/PascalCase
-        tokens = re.findall(r"[А-ЯA-Z][а-яa-z]*|[а-яa-z]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)", part)
+        tokens = _SPLIT_RE.findall(part)
         if tokens:
             words.extend(tokens)
         else:
@@ -192,9 +197,19 @@ class RegularSearch:
 
 
 class WordOrderSearch:
-    """Priority 4: Word-based substring matching across all definitions."""
+    """Priority 4: Word-based matching across all definitions.
+
+    Uses a cached inverted index (word → definitions) so that common queries
+    with fully-matching words skip a full scan of every definition.  When a
+    query word is not present as an exact token (partial/suffix matches), the
+    search falls back to the historical substring scan to preserve results.
+    """
 
     priority = 4
+
+    def __init__(self) -> None:
+        self._word_index: dict[str, list[Definition]] | None = None
+        self._index_signature: int | None = None
 
     def search(
         self,
@@ -232,6 +247,26 @@ class WordOrderSearch:
                         SearchResult(item, self.priority, matched, effective_owner)
                     )
 
+        pool = self._pool(all_methods, all_properties, all_types, all_members)
+        index = self._get_index(
+            all_methods, all_properties, all_types, all_members, pool
+        )
+
+        word_lists = [index.get(w) for w in words]
+        if all(word_lists):
+            # Fast path: all query words are exact tokens — scan only candidates
+            candidates: list[Definition] = []
+            seen_candidates: set[int] = set()
+            for token_list in word_lists:
+                for item in token_list:
+                    if id(item) not in seen_candidates:
+                        seen_candidates.add(id(item))
+                        candidates.append(item)
+            for item in candidates:
+                _include(item, _classify(item))
+            return results
+
+        # Fallback: substring scan across all definitions (historical behavior)
         for method in all_methods:
             _include(method, ApiType.METHOD)
         for prop in all_properties:
@@ -247,3 +282,58 @@ class WordOrderSearch:
                     _include(item, ApiType.PROPERTY)
 
         return results
+
+    @staticmethod
+    def _pool(
+        all_methods: list[MethodDefinition],
+        all_properties: list[PropertyDefinition],
+        all_types: list[PlatformTypeDefinition],
+        all_members: list[Definition] | None,
+    ) -> list[Definition]:
+        """Merge all definition pools with identity deduplication."""
+        pooled: list[Definition] = []
+        seen_ids: set[int] = set()
+        for item in [*all_methods, *all_properties, *all_types, *(all_members or [])]:
+            if id(item) not in seen_ids:
+                seen_ids.add(id(item))
+                pooled.append(item)
+        return pooled
+
+    def _get_index(
+        self,
+        all_methods: list[MethodDefinition],
+        all_properties: list[PropertyDefinition],
+        all_types: list[PlatformTypeDefinition],
+        all_members: list[Definition] | None,
+        pool: list[Definition],
+    ) -> dict[str, list[Definition]]:
+        """Build (or reuse) the word → definitions inverted index.
+
+        The index is cached on the object identity of the underlying lists,
+        which are stable for the lifetime of a storage instance.
+        """
+        signature = (
+            id(all_methods),
+            id(all_properties),
+            id(all_types),
+            id(all_members),
+        )
+        if self._index_signature != signature:
+            index: dict[str, list[Definition]] = {}
+            for item in pool:
+                for token in _split_words(item.name):
+                    index.setdefault(token, []).append(item)
+            self._word_index = index
+            self._index_signature = signature
+        return self._word_index
+
+
+def _classify(item: Definition) -> ApiType | None:
+    """Map a Definition to its ApiType for filtering."""
+    if isinstance(item, MethodDefinition):
+        return ApiType.METHOD
+    if isinstance(item, PropertyDefinition):
+        return ApiType.PROPERTY
+    if isinstance(item, PlatformTypeDefinition):
+        return ApiType.TYPE
+    return None

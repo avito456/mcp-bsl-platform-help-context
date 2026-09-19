@@ -39,13 +39,13 @@
 
 ## Этап 4. Производительность
 
-- [ ] `infrastructure/hbk/container_reader.py` — `mmap` вместо `read_bytes()`; срезы через `memoryview`/без лишних копий (сейчас ~3× пиковый расход памяти).
-- [ ] `content_reader.py:38-42` — lowercase-name-set для O(1) промахов имён (сейчас полный проход при каждом промахе).
-- [ ] `content_reader.py:76-82` — `_inflate_pack_block`: фильтровать `name.endswith("/")`, брать первый файл с непустым `file_size`, информативная ошибка.
-- [ ] `strategies.py:190-213` — инвертированный индекс «слово → сущности» для `WordOrderSearch` + ранний выход при насыщении ≥ limit.
-- [ ] `strategies.py:35` — добавить `ёЁ` в классы символов `_split_words`; precompiled regex в константу.
-- [ ] `semantic_engine.py`/`hybrid_engine.py` — именованные константы fetch-множителей, одна точка умножения (сейчас амплификация до 9×).
-- [ ] `hybrid_engine.py:86` — текст для переранжирования брать из payload/с контекстом типа, чтобы совпадал с индексированным.
+- [x] `infrastructure/hbk/container_reader.py` — `mmap` вместо `read_bytes()`; срезы через `memoryview`/без лишних копий (сейчас ~3× пиковый расход памяти).
+- [x] `content_reader.py:38-42` — lowercase-name-set для O(1) промахов имён (сейчас полный проход при каждом промахе).
+- [x] `content_reader.py:76-82` — `_inflate_pack_block`: фильтровать `name.endswith("/")`, брать первый файл с непустым `file_size`, информативная ошибка.
+- [x] `strategies.py:190-213` — инвертированный индекс «слово → сущности» для `WordOrderSearch` + ранний выход при насыщении ≥ limit.
+- [x] `strategies.py:35` — добавить `ёЁ` в классы символов `_split_words`; precompiled regex в константу.
+- [x] `semantic_engine.py`/`hybrid_engine.py` — именованные константы fetch-множителей, одна точка умножения (сейчас амплификация до 9×).
+- [x] `hybrid_engine.py:86` — текст для переранжирования брать из payload/с контекстом типа, чтобы совпадал с индексированным.
 
 ## Этап 5. Полировка и мёртвый код
 

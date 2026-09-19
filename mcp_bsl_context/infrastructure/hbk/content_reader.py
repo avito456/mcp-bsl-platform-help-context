@@ -21,6 +21,7 @@ class HbkContext:
         self.toc = toc
         self._zip = zip_file
         self._name_set: set[str] | None = None
+        self._lower_to_name: dict[str, str] | None = None
 
     def read_page(self, path: str) -> str | None:
         """Read an HTML page by its path from the ZIP archive."""
@@ -31,16 +32,16 @@ class HbkContext:
             normalized = path.replace("\\", "/").lstrip("/")
             if self._name_set is None:
                 self._name_set = set(self._zip.namelist())
+                self._lower_to_name = {n.lower(): n for n in self._name_set}
 
             if normalized in self._name_set:
                 # Pages carry a UTF-8 BOM (EF BB BF); utf-8-sig strips it
                 return self._zip.read(normalized).decode("utf-8-sig", errors="replace")
 
-            # Try case-insensitive match
-            lower = normalized.lower()
-            for name in self._name_set:
-                if name.lower() == lower:
-                    return self._zip.read(name).decode("utf-8-sig", errors="replace")
+            # Case-insensitive match via an O(1) lookup instead of a full scan
+            original = self._lower_to_name.get(normalized.lower())
+            if original is not None:
+                return self._zip.read(original).decode("utf-8-sig", errors="replace")
         except (KeyError, zipfile.BadZipFile) as e:
             logger.warning("Failed to read page '%s': %s", path, e)
         return None
@@ -75,9 +76,13 @@ class HbkContentReader:
 
     @staticmethod
     def _inflate_pack_block(data: bytes) -> bytes:
-        """Decompress the PackBlock ZIP to get TOC bracket file."""
+        """Decompress the PackBlock ZIP to get the TOC bracket file."""
         with zipfile.ZipFile(io.BytesIO(data)) as zf:
-            names = zf.namelist()
+            names = [n for n in zf.namelist() if not n.endswith("/") and n]
             if not names:
-                raise ValueError("PackBlock ZIP is empty")
-            return zf.read(names[0])
+                raise ValueError("PackBlock ZIP contains no files")
+            for name in names:
+                info = zf.getinfo(name)
+                if info.file_size > 0:
+                    return zf.read(name)
+            raise ValueError("PackBlock ZIP files are all empty")

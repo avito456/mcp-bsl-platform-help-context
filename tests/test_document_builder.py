@@ -143,6 +143,25 @@ class TestTypeDocument:
         doc = builder.build_from_type(type_def)
         assert doc.text == "ПустойТип"
 
+    def test_build_text_includes_type_context(self, builder):
+        """build_text(type_name=...) must match the indexed format."""
+        method = MethodDefinition(name="Добавить", description="")
+        from mcp_bsl_context.infrastructure.embeddings.document_builder import (
+            DocumentBuilder,
+        )
+
+        assert DocumentBuilder().build_text(method) == "Добавить"
+        with_type = DocumentBuilder().build_text(method, type_name="ТаблицаЗначений")
+        assert with_type.startswith("ТаблицаЗначений.Добавить")
+
+    def test_build_text_type_ignores_type_context(self, builder):
+        from mcp_bsl_context.infrastructure.embeddings.document_builder import (
+            DocumentBuilder,
+        )
+
+        type_def = PlatformTypeDefinition(name="МойТип", description="")
+        assert DocumentBuilder().build_text(type_def, type_name="X") == "МойТип"
+
 
 class TestBuildAll:
     def test_builds_global_and_type_members(self, builder):
