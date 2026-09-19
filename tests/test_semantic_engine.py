@@ -156,6 +156,24 @@ class TestSemanticSearchEngineIndex:
     def test_has_collection_after_index(self, engine_no_reranker):
         assert engine_no_reranker._has_collection()
 
+    def test_collection_persists_across_instances(self, tmp_path, fake_storage):
+        """Smoke test: index survives restart (reopened from disk without inference)."""
+        provider = FakeEmbeddingProvider(dim=4)
+        engine1 = SemanticSearchEngine(
+            embedding_provider=provider,
+            qdrant_path=str(tmp_path / "qdrant"),
+            reranker=None,
+        )
+        engine1.ensure_ready(fake_storage)
+        engine1._client.close()
+        # A brand-new instance pointed at the same path must see the collection
+        engine2 = SemanticSearchEngine(
+            embedding_provider=provider,
+            qdrant_path=str(tmp_path / "qdrant"),
+            reranker=None,
+        )
+        assert engine2._has_collection()
+
 
 class TestSemanticSearchWithReranker:
     def test_reranker_is_applied(self, engine_with_reranker, fake_storage):

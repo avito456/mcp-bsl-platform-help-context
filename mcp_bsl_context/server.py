@@ -158,7 +158,36 @@ def create_server(config: AppConfig):
     """
     from fastmcp import FastMCP
 
-    mcp = FastMCP("mcp-bsl-context")
+    instructions = (
+        "Этот MCP-сервер предоставляет доступ к документации API платформы "
+        "1С:Предприятие. Инструкции по использованию инструментов:\n"
+        "1. Начинайте с инструмента search для нахождения нужных элементов API. "
+        "Используйте конкретные термины 1С (русские или английские), например "
+        "'НайтиПоСсылке', 'ТаблицаЗначений.Добавить'.\n"
+        "2. Результаты search возвращают точные имена элементов в таблицах. "
+        "Используйте их как есть при последующих вызовах info/get_member(s). "
+        "Шаблонные типы справочников/документов имеют вид "
+        "'СправочникОбъект.<Имя справочника>' — подставляйте имя целиком, "
+        "включая угловые скобки и '<Имя справочника>'.\n"
+        "3. После нахождения элемента получайте полную документацию через info "
+        "по точному имени.\n"
+        "4. Для обзора всех методов/свойств типа сначала вызовите get_members, "
+        "затем get_member для конкретного метода или свойства.\n"
+        "5. Для создания объектов используйте get_constructors.\n"
+        "6. Поиск поддерживает три режима: keyword (быстрый, по именам — "
+        "рекомендуется для точных имён API), semantic и hybrid (для запросов на "
+        "естественном языке, например 'как добавить строку в таблицу значений'). "
+        "По умолчанию используется режим из конфигурации (hybrid).\n"
+        "7. Для вопросов о строгой типизации BSL используйте "
+        "get_strict_typing_info (сначала topic='topics' для списка тем), для "
+        "рекомендаций по стилю кода — get_coding_guideline.\n"
+        "8. get_platform_info сообщает версию платформы, для которой доступна "
+        "документация.\n"
+        "9. Если поиск не дал результатов, попробуйте другой режим или более "
+        "общий термин; не выдумывайте имена API, которых нет в ответах."
+    )
+
+    mcp = FastMCP("mcp-bsl-context", instructions=instructions)
 
     # Wire dependencies
     loader = PlatformContextLoader()
@@ -177,6 +206,19 @@ def create_server(config: AppConfig):
     repository = PlatformRepository(keyword_engine)
     service = ContextSearchService(repository)
     formatter = MarkdownFormatter()
+
+    def _format_lookup_error(exc: DomainException) -> str:
+        text = formatter.format_error(exc)
+        msg = str(exc)
+        if "not found" in msg.lower() or "не найден" in msg.lower():
+            text += (
+                "\n\n**Подсказка:** элемент не найден по точному имени. Найдите "
+                "точное имя через `search` (по фрагменту имени или с фильтром "
+                "`type=type`) и используйте его как есть. Шаблонные типы "
+                "справочников/документов задаются полностью, например "
+                "`СправочникОбъект.<Имя справочника>`."
+            )
+        return text
 
     # Lazy-loaded semantic/hybrid components
     semantic_state = _LazySemanticState(config, storage, keyword_engine)
@@ -206,6 +248,13 @@ def create_server(config: AppConfig):
             mode: Режим поиска: 'keyword' (быстрый, по именам), 'semantic' (по смыслу), 'hybrid' (оба + rerank). По умолчанию из конфигурации
             type: Фильтр по типу элемента: 'method', 'property' или 'type'
             limit: Максимальное количество результатов (1–50, по умолчанию 10)
+
+        Примечания:
+            - keyword-режим возвращает точные имена API — используйте их как есть
+              в info/get_member(s).
+            - Шаблонные типы справочников/документов указываются как
+              'СправочникОбъект.<Имя справочника>' (с угловыми скобками).
+            - semantic/hybrid-режимы понимают запросы на естественном языке.
         """
         effective_mode = mode or config.search.default_mode
         if effective_mode not in VALID_MODES:
@@ -255,21 +304,21 @@ def create_server(config: AppConfig):
             definition = service.get_info(name, type)
             return formatter.format_member(definition)
         except DomainException as e:
-            return formatter.format_error(e)
+            return _format_lookup_error(e)
 
     @mcp.tool()
     def get_member(type_name: str, member_name: str) -> str:
         """Получить информацию о методе или свойстве конкретного типа платформы 1С.
 
         Args:
-            type_name: Имя типа (например, 'СправочникСсылка', 'CatalogRef', 'ТаблицаЗначений')
+            type_name: Имя типа (например, 'СправочникСсылка', 'CatalogRef', 'ТаблицаЗначений'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
             member_name: Имя метода или свойства внутри типа (например, 'Добавить', 'Количество')
         """
         try:
             definition = service.find_member_by_type_and_name(type_name, member_name)
             return formatter.format_member(definition)
         except DomainException as e:
-            return formatter.format_error(e)
+            return _format_lookup_error(e)
 
     @mcp.tool()
     def get_members(type_name: str) -> str:
@@ -279,13 +328,13 @@ def create_server(config: AppConfig):
         для указанного типа.
 
         Args:
-            type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'СправочникОбъект')
+            type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'СправочникОбъект'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
         """
         try:
             members = service.find_type_members(type_name)
             return formatter.format_type_members(members)
         except DomainException as e:
-            return formatter.format_error(e)
+            return _format_lookup_error(e)
 
     @mcp.tool()
     def get_constructors(type_name: str) -> str:
@@ -294,13 +343,13 @@ def create_server(config: AppConfig):
         Возвращает все варианты конструкторов с параметрами и описаниями.
 
         Args:
-            type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'Массив')
+            type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'Массив'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
         """
         try:
             constructors = service.find_constructors(type_name)
             return formatter.format_constructors(constructors, type_name)
         except DomainException as e:
-            return formatter.format_error(e)
+            return _format_lookup_error(e)
 
     @mcp.tool()
     def get_platform_info() -> str:
