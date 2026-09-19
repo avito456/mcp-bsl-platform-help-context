@@ -23,7 +23,7 @@ classifiers = [
     "Topic :: Software Development :: Documentation",
 ]
 dependencies = [
-    "fastmcp>=2.0,<3",
+    "fastmcp>=4.0,<5",
     "beautifulsoup4>=4.12.0",
     "lxml>=5.0.0",
     "click>=8.1.0",
