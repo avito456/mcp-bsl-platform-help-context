@@ -344,7 +344,7 @@ def generate_config(target: Path, platform_path: str, dry_run: bool, actions: li
     pm = re.search(r'(?m)^(\s*)path:\s*"[^"]*"\s*$', text)
     if not pm:
         raise InstallerError("config template: platform 'path:' line not found")
-    text = text[: pm.start()] + f'{pm.group(1)}path: {json.dumps(platform_path)}' + text[pm.end() :]
+    text = text[: pm.start()] + f'{pm.group(1)}path: {json.dumps(platform_path, ensure_ascii=False)}' + text[pm.end() :]
 
     # MCP clients (opencode/Claude Code) spawn the server over stdio.
     server_header = text.find("server:")
@@ -360,8 +360,8 @@ def generate_config(target: Path, platform_path: str, dry_run: bool, actions: li
         _eprint(_Color.warn("  ! 'server.mode' not set to stdio in generated config.yml"))
 
     replacements = [
-        ("qdrant_path: ./data/qdrant", f"qdrant_path: {json.dumps(str(target / 'data' / 'qdrant'))}"),
-        ("models_cache: ./data/models", f"models_cache: {json.dumps(str(target / 'data' / 'models'))}"),
+        ("qdrant_path: ./data/qdrant", f"qdrant_path: {json.dumps(str(target / 'data' / 'qdrant'), ensure_ascii=False)}"),
+        ("models_cache: ./data/models", f"models_cache: {json.dumps(str(target / 'data' / 'models'), ensure_ascii=False)}"),
     ]
     for old, new in replacements:
         if old in text:
