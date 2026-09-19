@@ -19,7 +19,3 @@ class TypeMemberNotFoundException(DomainException):
 
 class PlatformContextLoadException(DomainException):
     pass
-
-
-class DefinitionNotFoundException(DomainException):
-    pass

@@ -117,12 +117,12 @@ class TestSearchStrictTyping:
     def test_found_single(self, service):
         result = service.search_strict_typing("массив")
         assert "arrays" in result
-        assert "1 совпадений" in result or "совпадений" in result
+        assert "1 совпадение" in result
 
     def test_found_multiple(self, service):
         result = service.search_strict_typing("типов")
-        # Should match in overview and/or constructor-functions
-        assert "совпадений" in result
+        # Any Russian plural form ('совпадение/совпадения/совпадений')
+        assert "совпадени" in result
 
     def test_found_code_example(self, service):
         result = service.search_strict_typing("СписокСсылок")

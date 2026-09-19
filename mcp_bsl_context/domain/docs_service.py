@@ -89,13 +89,27 @@ class DocsInfoService:
         if not results:
             return f"По запросу «{stripped}» ничего не найдено."
 
-        header = f"**Результаты поиска по запросу «{stripped}»** ({len(results)} совпадений):\n"
+        header = (
+            f"**Результаты поиска по запросу «{stripped}»** "
+            f"({len(results)} {self._pluralize(len(results))}):\n"
+        )
         return header + "\n\n---\n\n".join(results)
 
     def _ensure_topics(self) -> dict[str, str]:
         if self._topics is None:
             self._topics = self._parse_topics(self._strict_types_content)
         return self._topics
+
+    @staticmethod
+    def _pluralize(count: int) -> str:
+        """Russian plural form of 'совпадение' for a given count."""
+        n10 = count % 10
+        n100 = count % 100
+        if n10 == 1 and n100 != 11:
+            return "совпадение"
+        if 2 <= n10 <= 4 and not 12 <= n100 <= 14:
+            return "совпадения"
+        return "совпадений"
 
     @staticmethod
     def _parse_topics(content: str) -> dict[str, str]:

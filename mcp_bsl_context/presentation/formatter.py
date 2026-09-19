@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from mcp_bsl_context.domain.entities import (
     Definition,
     MethodDefinition,
@@ -10,6 +12,8 @@ from mcp_bsl_context.domain.entities import (
     PropertyDefinition,
     Signature,
 )
+
+_ESCAPE_RE = re.compile(r"[\\`*_|\[\]<>]")
 
 
 class MarkdownFormatter:
@@ -40,47 +44,66 @@ class MarkdownFormatter:
             return self._format_method(definition)
         if isinstance(definition, PropertyDefinition):
             return self._format_property(definition)
-        return f"**{definition.name}**\n{definition.description}\n"
+        return f"**{self._escape_inline(definition.name)}**\n{definition.description}\n"
 
-    def format_type_members(self, members: list[Definition]) -> str:
-        methods = [m for m in members if isinstance(m, MethodDefinition)]
-        properties = [p for p in members if isinstance(p, PropertyDefinition)]
+    def format_type_members(
+        self,
+        members: list[Definition],
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> str:
+        """Format the members of a type, optionally paged by limit/offset.
+
+        When the list overflows the paging window, a line with the remaining
+        count is appended.
+        """
+        total = len(members)
+        if limit is not None:
+            page = members[offset : offset + limit]
+        else:
+            page = members[offset:]
+
+        methods = [m for m in page if isinstance(m, MethodDefinition)]
+        properties = [p for p in page if isinstance(p, PropertyDefinition)]
 
         parts: list[str] = []
 
         if methods:
             parts.append("## Methods\n")
             for m in methods:
-                parts.append(f"- **{m.name}**")
+                parts.append(f"- **{self._escape_inline(m.name)}**")
                 if m.description:
-                    short = m.description[:100]
-                    if len(m.description) > 100:
-                        short += "..."
-                    parts.append(f"  {short}")
+                    parts.append(
+                        f"  {self._escape_inline(self._truncate(m.description, 100))}"
+                    )
             parts.append("")
 
         if properties:
             parts.append("## Properties\n")
             for p in properties:
                 ro = " *(read-only)*" if p.is_read_only else ""
-                parts.append(f"- **{p.name}**{ro}")
+                parts.append(f"- **{self._escape_inline(p.name)}**{ro}")
                 if p.description:
-                    short = p.description[:100]
-                    if len(p.description) > 100:
-                        short += "..."
-                    parts.append(f"  {short}")
+                    parts.append(
+                        f"  {self._escape_inline(self._truncate(p.description, 100))}"
+                    )
             parts.append("")
 
-        if not parts:
+        if not parts and not (limit is not None and offset < total):
             return "No members found.\n"
+
+        if limit is not None and offset + limit < total:
+            parts.append(f"*…and {total - (offset + limit)} more members*\n")
 
         return "\n".join(parts)
 
     def format_constructors(self, constructors: list[Signature], type_name: str) -> str:
         if not constructors:
-            return f"Type **{type_name}** has no constructors.\n"
+            return f"Type **{self._escape_inline(type_name)}** has no constructors.\n"
 
-        parts: list[str] = [f"## Constructors for {type_name}\n"]
+        parts: list[str] = [
+            f"## Constructors for {self._escape_inline(type_name)}\n"
+        ]
 
         for ctor in constructors:
             if ctor.parameters:
@@ -97,13 +120,14 @@ class MarkdownFormatter:
                 parts.append("**Parameters:**\n")
                 for p in ctor.parameters:
                     req = " *(required)*" if p.required else ""
-                    parts.append(f"- `{p.name}`{req} — {p.description}")
+                    desc = f" — {self._escape_inline(p.description)}" if p.description else ""
+                    parts.append(f"- `{p.name}`{req}{desc}")
                 parts.append("")
 
         return "\n".join(parts)
 
     def _format_type(self, type_def: PlatformTypeDefinition) -> str:
-        parts: list[str] = [f"## {type_def.name}\n"]
+        parts: list[str] = [f"## {self._escape_inline(type_def.name)}\n"]
 
         if type_def.description:
             parts.append(type_def.description)
@@ -126,12 +150,12 @@ class MarkdownFormatter:
             parts.append("")
 
         if type_def.constructors:
-            parts.append(f"**Constructors ({len(type_def.constructors)})**\n")
+            parts.append(f"**Constructors ({len(type_def.constructors)}):**\n")
 
         return "\n".join(parts)
 
     def _format_method(self, method: MethodDefinition) -> str:
-        parts: list[str] = [f"## {method.name}\n"]
+        parts: list[str] = [f"## {self._escape_inline(method.name)}\n"]
 
         if method.signatures:
             for sig in method.signatures:
@@ -142,7 +166,7 @@ class MarkdownFormatter:
                     parts.append("**Parameters:**\n")
                     for p in sig.parameters:
                         req = " *(required)*" if p.required else ""
-                        desc = f" — {p.description}" if p.description else ""
+                        desc = f" — {self._escape_inline(p.description)}" if p.description else ""
                         parts.append(f"- `{p.name}`{req}{desc}")
                     parts.append("")
 
@@ -156,7 +180,7 @@ class MarkdownFormatter:
         return "\n".join(parts)
 
     def _format_property(self, prop: PropertyDefinition) -> str:
-        parts: list[str] = [f"## {prop.name}\n"]
+        parts: list[str] = [f"## {self._escape_inline(prop.name)}\n"]
 
         if prop.property_type:
             parts.append(f"**Type:** `{prop.property_type}`\n")
@@ -175,10 +199,10 @@ class MarkdownFormatter:
 
         for item in results:
             kind = _get_kind_label(item)
-            desc = item.description[:80] if item.description else ""
-            if len(item.description) > 80:
-                desc += "..."
-            parts.append(f"- **{item.name}** ({kind}) — {desc}")
+            desc = self._truncate(item.description, 80) if item.description else ""
+            parts.append(
+                f"- **{self._escape_inline(item.name)}** ({kind}) — {desc}"
+            )
 
         parts.append("")
         # Show details for the first result
@@ -196,13 +220,31 @@ class MarkdownFormatter:
 
         for i, item in enumerate(top5, 1):
             kind = _get_kind_label(item)
-            parts.append(f"| {i} | **{item.name}** | {kind} |")
+            parts.append(
+                f"| {i} | **{self._escape_inline(item.name)}** | {kind} |"
+            )
 
         parts.append("")
         # Show details for the first result
         parts.append("---\n")
         parts.append(self.format_member(results[0]))
         return "\n".join(parts)
+
+    @staticmethod
+    def _escape_inline(text: str) -> str:
+        """Escape markdown inline characters in plain-text spans."""
+        return _ESCAPE_RE.sub(lambda m: "\\" + m.group(0), text)
+
+    @staticmethod
+    def _truncate(text: str, limit: int) -> str:
+        """Truncate text to ``limit`` characters at a word boundary."""
+        if len(text) <= limit:
+            return text
+        cut = text[:limit]
+        space = cut.rfind(" ")
+        if space > limit // 2:
+            cut = cut[:space]
+        return cut.rstrip() + "..."
 
 
 def _get_kind_label(item: Definition) -> str:

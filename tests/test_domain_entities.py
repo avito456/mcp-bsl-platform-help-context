@@ -8,7 +8,7 @@ from mcp_bsl_context.domain.entities import (
     Signature,
 )
 from mcp_bsl_context.domain.enums import ApiType
-from mcp_bsl_context.domain.value_objects import SearchOptions, SearchQuery
+from mcp_bsl_context.domain.value_objects import SearchQuery
 
 
 class TestEntities:
@@ -77,15 +77,12 @@ class TestSearchQuery:
         q = SearchQuery(query="test")
         assert q.limit == 10
         assert q.type is None
-        assert q.options.case_sensitive is False
 
     def test_custom_options(self):
         q = SearchQuery(
             query="test",
             type=ApiType.METHOD,
             limit=5,
-            options=SearchOptions(exact_match=True),
         )
         assert q.type == ApiType.METHOD
         assert q.limit == 5
-        assert q.options.exact_match is True

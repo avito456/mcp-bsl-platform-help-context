@@ -2,17 +2,12 @@
 
 from __future__ import annotations
 
+import click
 import logging
 import sys
 
 
 def main() -> None:
-    try:
-        import click
-    except ImportError:
-        print("Error: 'click' package is required. Install with: pip install click", file=sys.stderr)
-        sys.exit(1)
-
     @click.command()
     @click.option(
         "--config", "-c",

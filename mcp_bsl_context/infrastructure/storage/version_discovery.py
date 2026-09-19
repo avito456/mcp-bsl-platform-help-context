@@ -27,7 +27,7 @@ class PlatformVersionInfo:
     """Resolved version state exposed to MCP tools."""
 
     active_version: PlatformVersion | None
-    active_hbk_path: Path
+    active_hbk_path: Path | None
     available_versions: list[PlatformVersion]
 
 

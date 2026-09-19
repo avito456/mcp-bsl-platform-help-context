@@ -14,9 +14,6 @@ class ApiType(Enum):
     def get_display_name(self) -> str:
         return _DISPLAY_NAMES[self]
 
-    def get_plural_name(self) -> str:
-        return _PLURAL_NAMES[self]
-
     @classmethod
     def from_string(cls, type_str: str) -> ApiType | None:
         return _STRING_MAPPING.get(type_str.lower())
@@ -27,13 +24,6 @@ _DISPLAY_NAMES = {
     ApiType.PROPERTY: "Свойство",
     ApiType.TYPE: "Тип",
     ApiType.CONSTRUCTOR: "Конструктор",
-}
-
-_PLURAL_NAMES = {
-    ApiType.METHOD: "Методы",
-    ApiType.PROPERTY: "Свойства",
-    ApiType.TYPE: "Типы",
-    ApiType.CONSTRUCTOR: "Конструкторы",
 }
 
 _STRING_MAPPING: dict[str, ApiType] = {

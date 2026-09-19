@@ -119,6 +119,63 @@ class TestMarkdownFormatter:
         assert "M1" in result
         assert "P1" in result
 
+    def test_format_type_members_limit(self):
+        members = [
+            MethodDefinition(name=f"M{i}", description=f"m{i}")
+            for i in range(25)
+        ]
+        result = self.formatter.format_type_members(members, limit=20)
+        assert "M4" in result
+        assert "M20" not in result
+        assert "5 more members" in result
+
+    def test_format_type_members_limit_and_offset(self):
+        members = [
+            MethodDefinition(name=f"M{i}", description="")
+            for i in range(25)
+        ]
+        result = self.formatter.format_type_members(members, limit=10, offset=20)
+        assert "M20" in result
+        assert "M24" in result
+        assert "M19" not in result
+        assert "more members" not in result
+
+    def test_format_type_members_empty(self):
+        result = self.formatter.format_type_members([])
+        assert "No members" in result
+
+    def test_escape_inline_markdown_chars(self):
+        method = MethodDefinition(
+            name="СправочникОбъект.<Имя>",
+            description="Описание [см. также] | тест",
+        )
+        # Headers are escaped so markdown chars in names don't break rendering.
+        result = self.formatter.format_member(method)
+        assert "СправочникОбъект.\\<Имя\\>" in result
+
+        # Short inline fragments in result lists are escaped too.
+        listed = self.formatter.format_type_members([method], limit=20)
+        assert "Описание \\[см. также\\] \\| тест" in listed
+
+    def test_escape_does_not_touch_code_spans(self):
+        prop = PropertyDefinition(
+            name="P",
+            property_type="СправочникОбъект.<Имя справочника>",
+            description="test",
+        )
+        result = self.formatter.format_member(prop)
+        assert "`СправочникОбъект.<Имя справочника>`" in result
+
+    def test_truncate_description_at_word_boundary(self):
+        method = MethodDefinition(
+            name="M",
+            description="a" * 90 + " word " + "b" * 30,
+        )
+        result = self.formatter.format_type_members([method], limit=20)
+        # 'word' stays intact instead of being split mid-word
+        assert "word..." in result
+        assert "b" * 30 not in result
+
     def test_format_error(self):
         result = self.formatter.format_error(Exception("test error"))
         assert "Error" in result

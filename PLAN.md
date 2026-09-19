@@ -49,12 +49,12 @@
 
 ## Этап 5. Полировка и мёртвый код
 
-- [ ] `presentation/formatter.py` — `_escape_inline()` (`\`, `` ` ``, `*`, `_`, `|`, `[`, `]`, `<`, `>`) для имён/описаний/таблиц; `**Constructors (N):**` (двоеточие); обрезка по границе слова.
-- [ ] `domain/docs_service.py:92` — `_plural()` → «совпадение/совпадения/совпадений» (сейчас «1 совпадений»).
-- [ ] `server.py` — лимит вывода `get_members` (10–20 + «…ещё M», опциональный `offset`); `SERVER_INSTRUCTIONS` в константу модуля; `type` → `type_filter`; `_format_lookup_error` — по типам исключений, не по тексту сообщения.
-- [ ] `__main__.py` — убрать недостижимую click-ветку (click обязательная зависимость); подавление логов MCP через публичный API.
-- [ ] `config.py` — дополнить `_ENV_MAPPING` (`search.default_mode`, `embeddings.*`, `reranker.*`, `storage.*`); удалить `IndexConfig.reset_cache`.
-- [ ] Удалить мёртвое: `SearchOptions.case_sensitive/exact_match`, `DefinitionNotFoundException`, `ApiType.get_plural_name`, nullable `active_hbk_path` вместо пустого `Path()`.
+- [x] `presentation/formatter.py` — `_escape_inline()` (`\`, `` ` ``, `*`, `_`, `|`, `[`, `]`, `<`, `>`) для имён/описаний/таблиц; `**Constructors (N):**` (двоеточие); обрезка по границе слова.
+- [x] `domain/docs_service.py:92` — `_plural()` → «совпадение/совпадения/совпадений» (сейчас «1 совпадений»).
+- [x] `server.py` — лимит вывода `get_members` (10–20 + «…ещё M», опциональный `offset`); `SERVER_INSTRUCTIONS` в константу модуля; `type` → `type_filter`; `_format_lookup_error` — по типам исключений, не по тексту сообщения.
+- [x] `__main__.py` — убрать недостижимую click-ветку (click обязательная зависимость); подавление логов MCP через публичный API.
+- [x] `config.py` — дополнить `_ENV_MAPPING` (`search.default_mode`, `embeddings.*`, `reranker.*`, `storage.*`); удалить `IndexConfig.reset_cache`.
+- [x] Удалить мёртвое: `SearchOptions.case_sensitive/exact_match`, `DefinitionNotFoundException`, `ApiType.get_plural_name`, nullable `active_hbk_path` вместо пустого `Path()`.
 
 ## Этап 6. Тесты
 

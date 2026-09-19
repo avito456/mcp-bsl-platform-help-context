@@ -12,7 +12,12 @@ from typing import Any, Callable
 from mcp_bsl_context.config import AppConfig
 from mcp_bsl_context.domain.docs_service import DocsInfoService, DocsLoadException
 from mcp_bsl_context.domain.entities import Definition
-from mcp_bsl_context.domain.exceptions import DomainException, PlatformContextLoadException
+from mcp_bsl_context.domain.exceptions import (
+    DomainException,
+    PlatformContextLoadException,
+    PlatformTypeNotFoundException,
+    TypeMemberNotFoundException,
+)
 from mcp_bsl_context.domain.services import ContextSearchService
 from mcp_bsl_context.domain.value_objects import PlatformVersion, find_closest_version
 from mcp_bsl_context.infrastructure.search.engine import SimpleSearchEngine
@@ -31,6 +36,38 @@ MIN_LIMIT = 1
 MAX_LIMIT = 50
 DEFAULT_LIMIT = 10
 VALID_MODES = {"keyword", "semantic", "hybrid"}
+DEFAULT_MEMBERS_LIMIT = 20
+
+SERVER_INSTRUCTIONS = (
+    "Этот MCP-сервер предоставляет доступ к документации API платформы "
+    "1С:Предприятие. Инструкции по использованию инструментов:\n"
+    "1. Начинайте с инструмента search для нахождения нужных элементов API. "
+    "Используйте конкретные термины 1С (русские или английские), например "
+    "'НайтиПоСсылке', 'ТаблицаЗначений.Добавить'.\n"
+    "2. Результаты search возвращают точные имена элементов в таблицах. "
+    "Используйте их как есть при последующих вызовах info/get_member(s). "
+    "Шаблонные типы справочников/документов имеют вид "
+    "'СправочникОбъект.<Имя справочника>' — подставляйте имя целиком, "
+    "включая угловые скобки и '<Имя справочника>'.\n"
+    "3. После нахождения элемента получайте полную документацию через info "
+    "по точному имени.\n"
+    "4. Для обзора всех методов/свойств типа сначала вызовите get_members, "
+    "затем get_member для конкретного метода или свойства. Первым вызовом "
+    "get_members возвращается до 20 членов — используйте параметры limit и "
+    "offset для постраничного просмотра полного списка.\n"
+    "5. Для создания объектов используйте get_constructors.\n"
+    "6. Поиск поддерживает три режима: keyword (быстрый, по именам — "
+    "рекомендуется для точных имён API), semantic и hybrid (для запросов на "
+    "естественном языке, например 'как добавить строку в таблицу значений'). "
+    "По умолчанию используется режим из конфигурации (hybrid).\n"
+    "7. Для вопросов о строгой типизации BSL используйте "
+    "get_strict_typing_info (сначала topic='topics' для списка тем), для "
+    "рекомендаций по стилю кода — get_coding_guideline.\n"
+    "8. get_platform_info сообщает версию платформы, для которой доступна "
+    "документация.\n"
+    "9. Если поиск не дал результатов, попробуйте другой режим или более "
+    "общий термин; не выдумывайте имена API, которых нет в ответах."
+)
 
 
 class _LazySemanticState:
@@ -173,36 +210,7 @@ def create_server(config: AppConfig):
 
     config.validate()
 
-    instructions = (
-        "Этот MCP-сервер предоставляет доступ к документации API платформы "
-        "1С:Предприятие. Инструкции по использованию инструментов:\n"
-        "1. Начинайте с инструмента search для нахождения нужных элементов API. "
-        "Используйте конкретные термины 1С (русские или английские), например "
-        "'НайтиПоСсылке', 'ТаблицаЗначений.Добавить'.\n"
-        "2. Результаты search возвращают точные имена элементов в таблицах. "
-        "Используйте их как есть при последующих вызовах info/get_member(s). "
-        "Шаблонные типы справочников/документов имеют вид "
-        "'СправочникОбъект.<Имя справочника>' — подставляйте имя целиком, "
-        "включая угловые скобки и '<Имя справочника>'.\n"
-        "3. После нахождения элемента получайте полную документацию через info "
-        "по точному имени.\n"
-        "4. Для обзора всех методов/свойств типа сначала вызовите get_members, "
-        "затем get_member для конкретного метода или свойства.\n"
-        "5. Для создания объектов используйте get_constructors.\n"
-        "6. Поиск поддерживает три режима: keyword (быстрый, по именам — "
-        "рекомендуется для точных имён API), semantic и hybrid (для запросов на "
-        "естественном языке, например 'как добавить строку в таблицу значений'). "
-        "По умолчанию используется режим из конфигурации (hybrid).\n"
-        "7. Для вопросов о строгой типизации BSL используйте "
-        "get_strict_typing_info (сначала topic='topics' для списка тем), для "
-        "рекомендаций по стилю кода — get_coding_guideline.\n"
-        "8. get_platform_info сообщает версию платформы, для которой доступна "
-        "документация.\n"
-        "9. Если поиск не дал результатов, попробуйте другой режим или более "
-        "общий термин; не выдумывайте имена API, которых нет в ответах."
-    )
-
-    mcp = FastMCP("mcp-bsl-context", instructions=instructions)
+    mcp = FastMCP("mcp-bsl-context", instructions=SERVER_INSTRUCTIONS)
 
     # Wire dependencies
     loader = PlatformContextLoader()
@@ -211,7 +219,7 @@ def create_server(config: AppConfig):
         storage = _create_json_storage(config.platform.json_path)
         version_info = PlatformVersionInfo(
             active_version=None,
-            active_hbk_path=Path(),
+            active_hbk_path=None,
             available_versions=[],
         )
     else:
@@ -224,12 +232,13 @@ def create_server(config: AppConfig):
 
     def _format_lookup_error(exc: DomainException) -> str:
         text = formatter.format_error(exc)
-        msg = str(exc)
-        if "not found" in msg.lower() or "не найден" in msg.lower():
+        if isinstance(
+            exc, (PlatformTypeNotFoundException, TypeMemberNotFoundException)
+        ):
             text += (
                 "\n\n**Подсказка:** элемент не найден по точному имени. Найдите "
                 "точное имя через `search` (по фрагменту имени или с фильтром "
-                "`type=type`) и используйте его как есть. Шаблонные типы "
+                "`type_filter=type`) и используйте его как есть. Шаблонные типы "
                 "справочников/документов задаются полностью, например "
                 "`СправочникОбъект.<Имя справочника>`."
             )
@@ -268,7 +277,7 @@ def create_server(config: AppConfig):
     def search(
         query: str,
         mode: str | None = None,
-        type: str | None = None,
+        type_filter: str | None = None,
         limit: int | None = None,
     ) -> str:
         """Поиск по документации API платформы 1С:Предприятие.
@@ -282,7 +291,7 @@ def create_server(config: AppConfig):
         Args:
             query: Поисковый запрос — имя метода/типа/свойства или текст на естественном языке
             mode: Режим поиска: 'keyword' (быстрый, по именам), 'semantic' (по смыслу), 'hybrid' (оба + rerank). По умолчанию из конфигурации
-            type: Фильтр по типу элемента: 'method', 'property' или 'type'
+            type_filter: Фильтр по типу элемента: 'method', 'property' или 'type'
             limit: Максимальное количество результатов (1–50, по умолчанию 10)
 
         Примечания:
@@ -306,14 +315,14 @@ def create_server(config: AppConfig):
             effective_limit = max(MIN_LIMIT, min(limit, MAX_LIMIT))
 
         if effective_mode == "keyword":
-            results = service.search_all(query, type, effective_limit)
+            results = service.search_all(query, type_filter, effective_limit)
         elif effective_mode == "semantic":
             results = semantic_state.semantic_search(
-                query, limit=effective_limit, type_filter=type
+                query, limit=effective_limit, type_filter=type_filter
             )
         else:  # hybrid
             results = semantic_state.hybrid_search(
-                query, limit=effective_limit, type_filter=type
+                query, limit=effective_limit, type_filter=type_filter
             )
         return (
             formatter.format_query(query)
@@ -322,7 +331,7 @@ def create_server(config: AppConfig):
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)
-    def info(name: str, type: str) -> str:
+    def info(name: str, type_filter: str) -> str:
         """Получить детальную информацию о конкретном элементе API платформы 1С.
 
         Возвращает полное описание, сигнатуры, параметры, возвращаемое значение.
@@ -330,9 +339,9 @@ def create_server(config: AppConfig):
 
         Args:
             name: Точное имя элемента (например, 'НайтиПоСсылке', 'FindByRef', 'ТаблицаЗначений')
-            type: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип)
+            type_filter: Тип элемента: 'method' (метод), 'property' (свойство) или 'type' (тип)
         """
-        definition = service.get_info(name, type)
+        definition = service.get_info(name, type_filter)
         return formatter.format_member(definition)
 
     @mcp.tool()
@@ -349,17 +358,28 @@ def create_server(config: AppConfig):
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)
-    def get_members(type_name: str) -> str:
-        """Получить полный список методов и свойств типа платформы 1С.
+    def get_members(
+        type_name: str,
+        limit: int = DEFAULT_MEMBERS_LIMIT,
+        offset: int = 0,
+    ) -> str:
+        """Получить методы и свойства типа платформы 1С (с постраничным выводом).
 
-        Возвращает структурированный список всех доступных методов и свойств
-        для указанного типа.
+        Возвращает структурированный список методов и свойств для указанного
+        типа с пагинацией: по умолчанию первые 20 членов; при наличии ещё
+        элементов добавляется строка '…and N more members'.
 
         Args:
             type_name: Имя типа (например, 'ТаблицаЗначений', 'ValueTable', 'СправочникОбъект'). Для шаблонных типов — полное имя, например 'СправочникОбъект.<Имя справочника>'
+            limit: Максимальное количество выводимых членов (1–100, по умолчанию 20)
+            offset: Смещение для постраничного просмотра (по умолчанию 0)
         """
         members = service.find_type_members(type_name)
-        return formatter.format_type_members(members)
+        effective_limit = max(1, min(limit, 100))
+        effective_offset = max(0, offset)
+        return formatter.format_type_members(
+            members, limit=effective_limit, offset=effective_offset
+        )
 
     @mcp.tool()
     @_safe_call(_format_lookup_error)
