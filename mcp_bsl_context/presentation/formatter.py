@@ -13,7 +13,11 @@ from mcp_bsl_context.domain.entities import (
     Signature,
 )
 
-_ESCAPE_RE = re.compile(r"[\\`*_|\[\]<>]")
+# ``<`` and ``>`` are safe inline (template type names like
+# "СправочникОбъект.<Имя справочника>" must round-trip unescaped so an AI
+# copies the exact name back into info/get_member lookups).  A leading ``<``
+# could open an HTML block, so it is escaped separately in _escape_inline.
+_ESCAPE_RE = re.compile(r"[\\`*_|\[\]]")
 
 
 class MarkdownFormatter:
@@ -267,7 +271,11 @@ class MarkdownFormatter:
     @staticmethod
     def _escape_inline(text: str) -> str:
         """Escape markdown inline characters in plain-text spans."""
-        return _ESCAPE_RE.sub(lambda m: "\\" + m.group(0), text)
+        escaped = _ESCAPE_RE.sub(lambda m: "\\" + m.group(0), text)
+        if escaped.startswith("<"):
+            # A leading ``<`` could be read as an HTML block by some renderers.
+            return "\\" + escaped
+        return escaped
 
     @staticmethod
     def _truncate(text: str, limit: int) -> str:

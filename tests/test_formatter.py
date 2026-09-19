@@ -149,9 +149,10 @@ class TestMarkdownFormatter:
             name="СправочникОбъект.<Имя>",
             description="Описание [см. также] | тест",
         )
-        # Headers are escaped so markdown chars in names don't break rendering.
+        # Angle brackets round-trip unescaped (template type names must be
+        # copy-pastable into lookups); other inline chars are escaped.
         result = self.formatter.format_member(method)
-        assert "СправочникОбъект.\\<Имя\\>" in result
+        assert "СправочникОбъект.<Имя>" in result
 
         # Short inline fragments in result lists are escaped too.
         listed = self.formatter.format_type_members([method], limit=20)
