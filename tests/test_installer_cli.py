@@ -126,6 +126,7 @@ def test_uninstall_roundtrip(runner: CliRunner, tmp_path) -> None:
     assert dry.exit_code == 0
     assert (tmp_path / "AGENTS.md").exists()
     assert (tmp_path / ".mcp.json").exists()
+    assert (tmp_path / "config.yml").exists()
 
     result = _run(runner, "uninstall", "--project", str(tmp_path))
     assert result.exit_code == 0
@@ -136,9 +137,36 @@ def test_uninstall_roundtrip(runner: CliRunner, tmp_path) -> None:
     assert "mcp" not in obj or SERVER_NAME not in obj["mcp"]
 
     assert not (tmp_path / ".mcp.json").exists()
-    assert (tmp_path / "config.yml").exists()  # left as-is
+    assert not (tmp_path / "config.yml").exists()  # installer-created config removed
     assert not (tmp_path / "AGENTS.md").exists()
     assert not (tmp_path / "CLAUDE.md").exists()
+
+
+def test_uninstall_keeps_pre_existing_config(runner: CliRunner, tmp_path) -> None:
+    cfg = tmp_path / "config.yml"
+    cfg.write_text(
+        "server:\n  mode: stdio\nplatform:\n  path: /my/own/1c\n",
+        encoding="utf-8",
+    )
+    platform = str(tmp_path / "platform-1c")
+    _run(runner, "install", "--project", str(tmp_path), "--platform-path", platform)
+
+    assert cfg.exists()  # installer skips an existing config
+
+    result = _run(runner, "uninstall", "--project", str(tmp_path))
+    assert result.exit_code == 0
+    assert cfg.exists()  # user-owned config (no installer marker) is left as-is
+    assert "left as-is" in result.output
+
+
+def test_uninstall_dry_run_keeps_config(runner: CliRunner, tmp_path) -> None:
+    platform = str(tmp_path / "platform-1c")
+    _run(runner, "install", "--project", str(tmp_path), "--platform-path", platform)
+
+    result = _run(runner, "uninstall", "--project", str(tmp_path), "--dry-run")
+    assert result.exit_code == 0
+    assert (tmp_path / "config.yml").exists()
+    assert "removed  " in result.output or "removed" in result.output
 
 
 def test_install_missing_target_fails(runner: CliRunner, tmp_path) -> None:
