@@ -53,6 +53,10 @@ index:
   reindex: false               # true = пересобрать индекс эмбеддингов при запуске.
                                # Также задаётся через env MCP_BSL_INDEX_REINDEX
                                # или CLI-флаг: mcp-bsl-context --reindex
+  warmup: false                # true = фоново загрузить модели семантики при старте
+                               # (не блокирует запуск сервера). Первый semantic/hybrid-
+                               # запрос сразу быстрый. Env MCP_BSL_INDEX_WARMUP /
+                               # CLI-флаг: mcp-bsl-context --warmup
 
 # Файлы документации (необязательно — используются встроенные по умолчанию)
 docs:
