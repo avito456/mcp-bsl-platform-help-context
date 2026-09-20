@@ -183,6 +183,11 @@ uv run mcp-bsl-context install --yes                            # все деф�
 uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить регистрацию
 ```
 
+`uninstall` убирает всё, что `install` добавил в целевой проект: раздел в
+`AGENTS.md`/`CLAUDE.md`, записи в `opencode.jsonc`/`.mcp.json` и `config.yml`
+(если он был создан инсталлятором). Конфиг, существовавший до установки,
+остаётся нетронутым.
+
 На интерактивном терминале голый `install` запускает мастер и спрашивает
 только то, что не удалось определить автоматически:
 
@@ -209,7 +214,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 ошибка, если значение невозможно определить автоматически).
 
 Требуется `uv` на PATH. После установки проверьте: `opencode mcp list` и
-`claude mcp get bsl-context` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`
+`claude mcp get bsl-context-1c` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`
 утверждается при первом запуске (`/mcp`).
 
 ### opencode
@@ -220,7 +225,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "type": "local",
       "command": ["uv", "run", "--project", "/path/to/mcp-bsl-platform-help-context", "mcp-bsl-context", "-c", "/path/to/project/config.yml"],
       "cwd": "/path/to/project",
@@ -237,7 +242,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 ```json
 {
   "mcpServers": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "type": "stdio",
       "command": "uv",
       "args": ["run", "--project", "/path/to/mcp-bsl-platform-help-context", "mcp-bsl-context", "-c", "/path/to/project/config.yml"]
@@ -246,7 +251,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 }
 ```
 
-Либо через CLI: `claude mcp add --scope project bsl-context -- uv run --project /path/to/mcp-bsl-platform-help-context mcp-bsl-context -c /path/to/project/config.yml`
+Либо через CLI: `claude mcp add --scope project bsl-context-1c -- uv run --project /path/to/mcp-bsl-platform-help-context mcp-bsl-context -c /path/to/project/config.yml`
 
 > В `config.yml` должен быть задан `platform.path` (инсталлятор создаёт этот файл
 > с путём к платформе 1С, если его нет). Если `config.yml` отсутствует, команда
@@ -259,7 +264,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 ```json
 {
   "mcpServers": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "command": "uv",
       "args": ["--project", "/path/to/mcp-bsl-platform-help-context", "run", "mcp-bsl-context", "-p", "/opt/1cv8/x86_64/8.3.25.1257"]
     }
@@ -274,7 +279,7 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 ```json
 {
   "mcpServers": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "command": "uv",
       "args": ["--project", "C:\\path\\to\\mcp-bsl-platform-help-context", "run", "mcp-bsl-context", "-p", "C:\\Program Files\\1cv8\\8.3.25.1257"]
     }
@@ -311,7 +316,7 @@ mcp-bsl-context -p /opt/1cv8/x86_64/8.3.25.1257 -m streamable-http --port 8080
 ```json
 {
   "mcpServers": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "url": "http://localhost:8080/mcp"
     }
   }
