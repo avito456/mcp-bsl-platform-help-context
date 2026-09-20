@@ -12,7 +12,8 @@ import asyncio
 import json
 
 from mcp_bsl_context.config import load_config
-from mcp_bsl_context.server import create_server
+from mcp_bsl_context.domain.value_objects import PlatformVersion
+from mcp_bsl_context.server import create_server, dedupe_versions
 
 _METHODS = [
     {"name": "НайтиПоСсылкам", "name_en": "FindByRef", "description": "Поиск элемента по ссылке"},
@@ -91,3 +92,29 @@ class TestSearchToolEmptyResult:
 
         assert "Внутренняя ошибка" not in output
         assert "НайтиПоСсылкам" in output
+
+
+class TestDedupeVersions:
+    def test_deduplicates_builds_of_same_release_preserving_order(self):
+        versions = [
+            PlatformVersion(8, 5, 1),
+            PlatformVersion(8, 3, 27),
+            PlatformVersion(8, 5, 1),
+            PlatformVersion(8, 4, 10),
+        ]
+        result = dedupe_versions(versions)
+        assert result == [
+            PlatformVersion(8, 5, 1),
+            PlatformVersion(8, 3, 27),
+            PlatformVersion(8, 4, 10),
+        ]
+
+    def test_distinct_versions_untouched(self):
+        versions = [
+            PlatformVersion(8, 3, 25),
+            PlatformVersion(8, 4, 10),
+        ]
+        assert dedupe_versions(versions) == versions
+
+    def test_empty_list_passes_through(self):
+        assert dedupe_versions([]) == []

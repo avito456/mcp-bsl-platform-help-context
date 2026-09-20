@@ -668,6 +668,16 @@ def create_server(config: AppConfig):
     return mcp
 
 
+def dedupe_versions(versions: list[PlatformVersion]) -> list[PlatformVersion]:
+    """Drop duplicate versions preserving the original order.
+
+    Several builds of the same release (8.5.1.1150, 8.5.1.1343) normalize to
+    one ``PlatformVersion('8.5.1')``; without dedup ``get_platform_info``
+    lists the same version multiple times.
+    """
+    return list(dict.fromkeys(versions))
+
+
 def _create_hbk_storage(
     loader: PlatformContextLoader,
     config: AppConfig,
@@ -717,7 +727,7 @@ def _create_hbk_storage(
     version_info_result = PlatformVersionInfo(
         active_version=resolved.version,
         active_hbk_path=resolved.hbk_path,
-        available_versions=[d.version for d in versioned],
+        available_versions=dedupe_versions([d.version for d in versioned]),
     )
 
     return storage, version_info_result
