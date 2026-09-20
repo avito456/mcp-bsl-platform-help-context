@@ -39,6 +39,12 @@ DEFAULT_LIMIT = 10
 VALID_MODES = {"keyword", "semantic", "hybrid"}
 DEFAULT_MEMBERS_LIMIT = 20
 
+# Cap for how long a semantic/hybrid call waits for the models to become
+# ready before degrading to a keyword fallback (see _LazySemanticState).
+# Bounded so the request always completes well inside MCP client timeouts
+# instead of blocking forever on model loading.
+SEMANTIC_READY_WAIT_TIMEOUT = 15.0
+
 SERVER_INSTRUCTIONS = (
     "Этот MCP-сервер предоставляет доступ к документации API платформы "
     "1С:Предприятие. Инструкции по использованию инструментов:\n"
@@ -96,6 +102,8 @@ class _LazySemanticState:
         self._semantic_engine = None
         self._hybrid_engine = None
         self._lock = threading.Lock()
+        self._ready = threading.Event()
+        self._warmup_started = False
         self._initialized = False
         self._init_error: str | None = None
 
@@ -119,6 +127,7 @@ class _LazySemanticState:
                     "pip install 'mcp-bsl-context[local]'"
                 )
                 self._initialized = True
+                self._ready.set()
                 raise RuntimeError(self._init_error) from exc
             except Exception as exc:
                 # Transient failures (network, API timeouts) are NOT cached:
@@ -131,21 +140,88 @@ class _LazySemanticState:
                     "Try again or use mode='keyword'."
                 ) from exc
             self._initialized = True
+            self._ready.set()
+
+    def _run_init_in_background(self) -> None:
+        """Run initialization in a daemon thread (used for background warmup)."""
+        try:
+            self._ensure_initialized()
+        except Exception as exc:
+            # Transient/persistent failures are logged here; the flag is reset
+            # so a later request can retry initialization from scratch.
+            with self._lock:
+                self._warmup_started = False
+            logger.warning("Background warmup failed (keyword mode still works): %s", exc)
+
+    def start_background_warmup(self) -> None:
+        """Eagerly load models and prebuild the index in a background thread.
+
+        Non-blocking: the server keeps serving requests (handshake, keyword
+        search) while the models load. This avoids stalling the MCP client on
+        the first semantic/hybrid call, which previously exceeded client
+        timeouts and broke the connection.
+        """
+        if self._initialized or self._warmup_started:
+            return
+        with self._lock:
+            if self._initialized or self._warmup_started:
+                return
+            self._warmup_started = True
+            logger.info("Starting background warmup of semantic search...")
+            threading.Thread(
+                target=self._run_init_in_background,
+                name="semantic-warmup",
+                daemon=True,
+            ).start()
+
+    def _wait_readiness(self, timeout: float) -> bool:
+        """Wait up to ``timeout`` seconds for initialization to finish.
+
+        Returns True when the semantic search became ready or failed
+        permanently; False if still initializing after the timeout.
+        """
+        self.start_background_warmup()
+        return self._ready.wait(timeout)
+
+    def _ensure_initialized_bounded(self, timeout: float) -> None:
+        """Initialize semantic search without blocking beyond ``timeout``.
+
+        Starts initialization in the background if needed and waits up to
+        ``timeout`` for it to complete. If the models are still loading after
+        the deadline, raises RuntimeError so the caller degrades gracefully
+        (e.g. keyword fallback) instead of exceeding the MCP client timeout.
+        """
+        if self._initialized:
+            if self._init_error:
+                raise RuntimeError(self._init_error)
+            return
+        if not self._wait_readiness(timeout):
+            raise RuntimeError(
+                "Semantic search is still initializing (models are loading "
+                "in the background). Try again in a few seconds or use "
+                "mode='keyword'."
+            )
+        if self._init_error:
+            raise RuntimeError(self._init_error)
 
     @property
     def status(self) -> str:
         """Human-readable semantic readiness for the ``health`` tool."""
-        if not self._initialized:
-            return "not-initialized (first semantic/hybrid call will load models and index)"
         if self._init_error:
             return f"failed: {self._init_error}"
-        return "ready"
+        if self._initialized:
+            return "ready"
+        if self._warmup_started:
+            return "initializing… (модели и индекс загружаются в фоне)"
+        return "not-initialized (first semantic/hybrid call will load models and index)"
 
     def initialize(self) -> None:
         """Eagerly load models and ensure the index is ready.
 
-        Used at startup when a forced reindex is requested (``--reindex``),
-        so the semantic index is (re)built before the first client request.
+        Blocking — used at startup when a forced reindex is requested
+        (``--reindex``), so the semantic index is (re)built before the first
+        client request. For the non-blocking variant see
+        ``start_background_warmup``.
         """
         self._ensure_initialized()
 
@@ -198,7 +274,7 @@ class _LazySemanticState:
         limit: int = 10,
         type_filter: str | None = None,
     ) -> list[Definition]:
-        self._ensure_initialized()
+        self._ensure_initialized_bounded(SEMANTIC_READY_WAIT_TIMEOUT)
         return self._semantic_engine.search(
             query, self._storage, limit=limit, type_filter=type_filter
         )
@@ -209,7 +285,7 @@ class _LazySemanticState:
         limit: int = 10,
         type_filter: str | None = None,
     ) -> list[Definition]:
-        self._ensure_initialized()
+        self._ensure_initialized_bounded(SEMANTIC_READY_WAIT_TIMEOUT)
         return self._hybrid_engine.search(
             query, self._storage, limit=limit, type_filter=type_filter
         )
@@ -287,14 +363,11 @@ def create_server(config: AppConfig):
         logger.info("--reindex requested: building semantic index at startup...")
         semantic_state.initialize()
 
-    # Warmup: load models and prepare the index without rebuilding.
-    # Non-fatal — keyword search keeps working if semantic is unavailable.
+    # Warmup: load models and prepare the index WITHOUT blocking the handshake.
+    # Models load in a background thread; non-fatal — keyword search keeps
+    # working if semantic is unavailable.
     if config.index.warmup and not config.index.reindex:
-        try:
-            logger.info("Warmup requested: loading semantic components...")
-            semantic_state.initialize()
-        except RuntimeError as exc:
-            logger.warning("Semantic warmup failed (keyword mode still works): %s", exc)
+        semantic_state.start_background_warmup()
 
     @mcp.tool()
     @_safe_call(lambda e: formatter.format_error(e))
