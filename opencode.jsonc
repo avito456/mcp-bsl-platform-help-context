@@ -13,7 +13,8 @@
         "/Users/ev/workspace/mcp-bsl-platform-help-context/config.yml"
       ],
       "cwd": "/Users/ev/workspace/mcp-bsl-platform-help-context",
-      "enabled": true
+      "enabled": true,
+      "timeout": 300000
     }
   }
 }
