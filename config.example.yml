@@ -21,6 +21,11 @@ platform:
   data_source: hbk             # hbk | json
   json_path: null              # обязателен при data_source=json
 
+  # Дополнять контекст глобальных методов бандленным супплементом
+  # для методов, отсутствующих в HBK (например, Выполнить). Реальные
+  # данные всегда имеют приоритет. false — только содержимое HBK.
+  use_supplements: true
+
 search:
   default_mode: hybrid         # hybrid | semantic | keyword
 

@@ -15,6 +15,7 @@ from mcp_bsl_context.domain.entities import (
 
 from .loader import PlatformContextLoader
 from .mapper import method_info_to_entity, object_info_to_entity, property_info_to_entity
+from .supplement import load_default_supplement, merge_supplement_methods
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +43,15 @@ def build_member_index(
 class PlatformContextStorage:
     """Thread-safe lazy-loading storage for platform context data."""
 
-    def __init__(self, loader: PlatformContextLoader, platform_path: Path) -> None:
+    def __init__(
+        self,
+        loader: PlatformContextLoader,
+        platform_path: Path,
+        use_supplements: bool = True,
+    ) -> None:
         self._loader = loader
         self._platform_path = platform_path
+        self._use_supplements = use_supplements
         self.methods: list[MethodDefinition] = []
         self.properties: list[PropertyDefinition] = []
         self.types: list[PlatformTypeDefinition] = []
@@ -91,6 +98,18 @@ class PlatformContextStorage:
         self.methods = [method_info_to_entity(m) for m in context.global_methods]
         self.properties = [property_info_to_entity(p) for p in context.global_properties]
         self.types = [object_info_to_entity(t) for t in context.types]
+
+        if self._use_supplements:
+            supplement = load_default_supplement()
+            if supplement:
+                merged, added = merge_supplement_methods(self.methods, supplement)
+                self.methods = merged
+                if added:
+                    logger.info(
+                        "%d глобальных метода(ов) добавлено из супплемента",
+                        added,
+                    )
+
         self.members, self.member_owner = build_member_index(self.types)
 
         logger.info(

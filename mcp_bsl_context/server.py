@@ -711,7 +711,9 @@ def _create_hbk_storage(
         else:
             resolved = discovered[0]
 
-    storage = PlatformContextStorage(loader, resolved.platform_dir)
+    storage = PlatformContextStorage(
+        loader, resolved.platform_dir, use_supplements=config.platform.use_supplements
+    )
     version_info_result = PlatformVersionInfo(
         active_version=resolved.version,
         active_hbk_path=resolved.hbk_path,

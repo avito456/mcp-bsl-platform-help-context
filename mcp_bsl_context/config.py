@@ -35,6 +35,7 @@ class PlatformConfig:
     version: str | None = None
     data_source: str = "hbk"
     json_path: str | None = None
+    use_supplements: bool = True
 
 
 @dataclass
@@ -141,6 +142,7 @@ _ENV_MAPPING: dict[str, tuple[str, str]] = {
     "MCP_BSL_PORT": ("server", "port"),
     "MCP_BSL_DATA_SOURCE": ("platform", "data_source"),
     "MCP_BSL_JSON_PATH": ("platform", "json_path"),
+    "MCP_BSL_PLATFORM_USE_SUPPLEMENTS": ("platform", "use_supplements"),
     "MCP_BSL_VERBOSE": ("server", "verbose"),
     "MCP_BSL_SEARCH_DEFAULT_MODE": ("search", "default_mode"),
     "MCP_BSL_EMBEDDINGS_PROVIDER": ("embeddings", "provider"),
