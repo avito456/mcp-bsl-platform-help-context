@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 VALID_SEARCH_MODES = {"keyword", "semantic", "hybrid"}
 VALID_DATA_SOURCES = {"hbk", "json"}
 VALID_PROVIDERS = {"local", "openai-compatible"}
+VALID_DEVICES = {"cpu", "cuda", "mps"}
 
 
 class ConfigValidationError(DomainException):
@@ -49,6 +50,7 @@ class EmbeddingsConfig:
     model: str = "ai-forever/ru-en-RoSBERTa"
     api_url: str | None = None
     api_key: str | None = None
+    device: str = "cpu"  # cpu | cuda | mps
 
 
 @dataclass
@@ -58,6 +60,7 @@ class RerankerConfig:
     model: str = "DiTy/cross-encoder-russian-msmarco"
     api_url: str | None = None
     api_key: str | None = None
+    device: str = "cpu"  # cpu | cuda | mps
 
 
 @dataclass
@@ -117,6 +120,15 @@ class AppConfig:
                 f"reranker.provider='{self.reranker.provider}' is invalid. "
                 f"Expected one of: {', '.join(sorted(VALID_PROVIDERS))}"
             )
+        for section, device in (
+            ("embeddings", self.embeddings.device),
+            ("reranker", self.reranker.device),
+        ):
+            if device not in VALID_DEVICES:
+                errors.append(
+                    f"{section}.device='{device}' is invalid. "
+                    f"Expected one of: {', '.join(sorted(VALID_DEVICES))}"
+                )
         if self.platform.data_source == "json" and not self.platform.json_path:
             errors.append(
                 "platform.json_path is required when "
@@ -149,11 +161,13 @@ _ENV_MAPPING: dict[str, tuple[str, str]] = {
     "MCP_BSL_EMBEDDINGS_MODEL": ("embeddings", "model"),
     "MCP_BSL_EMBEDDINGS_API_URL": ("embeddings", "api_url"),
     "MCP_BSL_EMBEDDINGS_API_KEY": ("embeddings", "api_key"),
+    "MCP_BSL_EMBEDDINGS_DEVICE": ("embeddings", "device"),
     "MCP_BSL_RERANKER_ENABLED": ("reranker", "enabled"),
     "MCP_BSL_RERANKER_PROVIDER": ("reranker", "provider"),
     "MCP_BSL_RERANKER_MODEL": ("reranker", "model"),
     "MCP_BSL_RERANKER_API_URL": ("reranker", "api_url"),
     "MCP_BSL_RERANKER_API_KEY": ("reranker", "api_key"),
+    "MCP_BSL_RERANKER_DEVICE": ("reranker", "device"),
     "MCP_BSL_STORAGE_QDRANT_PATH": ("storage", "qdrant_path"),
     "MCP_BSL_STORAGE_MODELS_CACHE": ("storage", "models_cache"),
     "MCP_BSL_INDEX_REINDEX": ("index", "reindex"),

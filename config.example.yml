@@ -34,6 +34,11 @@ embeddings:
   provider: local              # local | openai-compatible
   model: ai-forever/ru-en-RoSBERTa
 
+  # Устройство для локальных моделей: cpu | cuda | mps.
+  # По умолчанию cpu — безопасно: на Apple MPS PyTorch может уронить процесс
+  # (abort) при инициализации эмбеддингов, что обрывает MCP-сессию.
+  device: cpu
+
   # Для API-провайдеров (OpenRouter, LM Studio и др.):
   # api_url: http://localhost:1234/v1
   # api_key: your-api-key
@@ -45,6 +50,10 @@ reranker:
   enabled: true                # применить реранкинг результатов
   provider: local              # local | openai-compatible
   model: DiTy/cross-encoder-russian-msmarco
+
+  # Устройство для локальной модели: cpu | cuda | mps (см. комментарий выше).
+  device: cpu
+
   api_url: null
   api_key: null
 

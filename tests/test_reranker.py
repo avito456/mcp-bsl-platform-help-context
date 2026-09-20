@@ -123,3 +123,40 @@ class TestCreateReranker:
         config = RerankerConfig(enabled=True, provider="unknown")
         with pytest.raises(ValueError, match="Unknown reranker provider"):
             create_reranker(config)
+
+
+class TestLocalRerankerDevice:
+    def _install_fake_cross_encoder(self, monkeypatch):
+        import sys
+        import types
+
+        class FakeCE:
+            def __init__(self, *args, **kwargs):
+                self.args = args
+                self.kwargs = kwargs
+
+            def predict(self, pairs):
+                return [0.5] * len(pairs)
+
+        mod = types.ModuleType("sentence_transformers")
+        mod.CrossEncoder = FakeCE
+        monkeypatch.setitem(sys.modules, "sentence_transformers", mod)
+        return FakeCE
+
+    def test_default_device_is_cpu(self, monkeypatch):
+        ce = self._install_fake_cross_encoder(monkeypatch)
+        reranker = LocalReranker(model_name="test-model")
+        assert reranker._model.kwargs["device"] == "cpu"
+        assert reranker._model.args[0] == "test-model"
+
+    def test_factory_forwards_device(self, monkeypatch):
+        self._install_fake_cross_encoder(monkeypatch)
+        config = RerankerConfig(enabled=True, provider="local", device="mps")
+        reranker = create_reranker(config)
+        assert reranker._model.kwargs["device"] == "mps"
+
+    def test_rerank_uses_model(self, monkeypatch):
+        self._install_fake_cross_encoder(monkeypatch)
+        reranker = LocalReranker(model_name="test-model")
+        result = reranker.rerank("q", ["docA", "docB"])
+        assert [r.index for r in result] == [0, 1]

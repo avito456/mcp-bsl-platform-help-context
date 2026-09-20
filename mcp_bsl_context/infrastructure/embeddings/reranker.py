@@ -52,6 +52,7 @@ class LocalReranker(Reranker):
         self,
         model_name: str = "DiTy/cross-encoder-russian-msmarco",
         cache_dir: str | None = None,
+        device: str = "cpu",
     ) -> None:
         try:
             from sentence_transformers import CrossEncoder
@@ -65,8 +66,8 @@ class LocalReranker(Reranker):
             os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", cache_dir)
             os.environ.setdefault("HF_HOME", cache_dir)
 
-        logger.info("Loading reranker model: %s", model_name)
-        self._model = CrossEncoder(model_name, max_length=512)
+        logger.info("Loading reranker model: %s (device=%s)", model_name, device)
+        self._model = CrossEncoder(model_name, max_length=512, device=device)
         logger.info("Reranker model loaded")
 
     def rerank(
@@ -163,7 +164,9 @@ def create_reranker(
         return None
 
     if config.provider == "local":
-        return LocalReranker(model_name=config.model, cache_dir=cache_dir)
+        return LocalReranker(
+            model_name=config.model, cache_dir=cache_dir, device=config.device
+        )
     if config.provider == "openai-compatible":
         if not config.api_url:
             raise ValueError(

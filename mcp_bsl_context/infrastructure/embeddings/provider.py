@@ -59,6 +59,7 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         self,
         model_name: str = "ai-forever/ru-en-RoSBERTa",
         cache_dir: str | None = None,
+        device: str = "cpu",
     ) -> None:
         try:
             from sentence_transformers import SentenceTransformer
@@ -71,8 +72,10 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         if cache_dir:
             os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", cache_dir)
 
-        logger.info("Loading embedding model: %s", model_name)
-        self._model = SentenceTransformer(model_name, cache_folder=cache_dir)
+        logger.info("Loading embedding model: %s (device=%s)", model_name, device)
+        self._model = SentenceTransformer(
+            model_name, cache_folder=cache_dir, device=device
+        )
         self._dim: int = self._model.get_sentence_embedding_dimension()
         logger.info("Embedding model loaded, dimension: %d", self._dim)
 
@@ -185,7 +188,7 @@ def create_embedding_provider(
     """
     if config.provider == "local":
         return LocalEmbeddingProvider(
-            model_name=config.model, cache_dir=cache_dir
+            model_name=config.model, cache_dir=cache_dir, device=config.device
         )
     if config.provider == "openai-compatible":
         if not config.api_url:

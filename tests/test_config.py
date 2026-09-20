@@ -210,6 +210,25 @@ class TestValidate:
         with pytest.raises(ConfigValidationError):
             config.validate()
 
+    def test_invalid_embeddings_device(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.embeddings = EmbeddingsConfig(device="tpu")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_invalid_reranker_device(self):
+        config = AppConfig()
+        config.platform.path = "/opt/1cv8"
+        config.reranker = RerankerConfig(enabled=True, device="tpu")
+        with pytest.raises(ConfigValidationError):
+            config.validate()
+
+    def test_device_defaults_to_cpu(self):
+        config = AppConfig()
+        assert config.embeddings.device == "cpu"
+        assert config.reranker.device == "cpu"
+
     def test_json_source_requires_json_path(self):
         config = AppConfig()
         config.platform = PlatformConfig(data_source="json", json_path=None)

@@ -186,3 +186,48 @@ class TestCreateEmbeddingProvider:
         config = EmbeddingsConfig(provider="unknown")
         with pytest.raises(ValueError, match="Unknown embedding provider"):
             create_embedding_provider(config)
+
+
+@pytest.fixture
+def fake_sentence_transformers(monkeypatch):
+    """Install a fake 'sentence_transformers' module (import happens in __init__)."""
+    import sys
+    import types
+
+    class FakeST:
+        def __init__(self, *args, **kwargs):
+            self.args = args
+            self.kwargs = kwargs
+
+        def get_sentence_embedding_dimension(self):
+            return 384
+
+        def encode(self, texts, **kwargs):
+            import numpy as np
+
+            if isinstance(texts, str):
+                texts = [texts]
+            return np.zeros((len(texts), 384), dtype="float32")
+
+    mod = types.ModuleType("sentence_transformers")
+    mod.SentenceTransformer = FakeST
+    monkeypatch.setitem(sys.modules, "sentence_transformers", mod)
+    return FakeST
+
+
+class TestLocalEmbeddingProviderDevice:
+    def test_default_device_is_cpu(self, fake_sentence_transformers):
+        provider = LocalEmbeddingProvider(model_name="test-model")
+        assert provider._model.kwargs["device"] == "cpu"
+
+    def test_factory_forwards_device(self, fake_sentence_transformers):
+        config = EmbeddingsConfig(provider="local", device="mps")
+        provider = create_embedding_provider(config)
+        assert provider._model.kwargs["device"] == "mps"
+        assert provider._model.args[0] == config.model
+
+    def test_embedding_uses_model(self, fake_sentence_transformers):
+        provider = LocalEmbeddingProvider(model_name="test-model")
+        result = provider.embed_query("привет")
+        assert len(result) == 1
+        assert len(result[0]) == 384
