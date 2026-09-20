@@ -52,7 +52,34 @@
 
 ### 6. Верификация
 
-- `pytest tests/ -q`.
+- `pytest tests/ -q` — **311 passed, 17 skipped** (включая 8 новых тестов прогрува).
 - stdio-проба: `tools/list` быстрый при `warmup=true`, `health` → «warmup on startup»,
   после ~15 с `semantic: ready`, первый semantic-запрос ~0,1–0,3 с.
 - «connection closed» не воспроизводится, повторные semantic-запросы стабильны.
+
+## Статус: ВЫПОЛНЕНО
+
+| Шаг | Файлы | Коммит |
+|-----|-------|--------|
+| 1. План | `Docs/PLAN_SEMANTIC_WARMUP.md` | `c72a326` |
+| 2. server.py (async warmup) | `mcp_bsl_context/server.py` | `1cf81ec` |
+| 3. Конфиг | `config.example.yml` (+ runtime `config.yml`, локально, gitignored) | `cdc958b` |
+| 4. Таймаут opencode | `opencode.jsonc` (`timeout: 300000`) | `465dc5b` |
+| 5. Тесты | `tests/test_semantic_warmup.py` (8 тестов) | `0ab3a6c` |
+| 6. Документация | `README.md`, `Docs/CHANGELOG.md` | `658b93c` |
+| 7. Верификация | stdio-пробы (см. ниже) | — |
+
+### Результаты верификации (stdio, `warmup: true`)
+
+- `initialize` 0,5 с; `tools/list` **0,2 с** — хендшейк быстрый, таймаут opencode (5 с) не срабатывает.
+- `health` при старте: **«Semantic search: initializing… (модели и индекс загружаются в фоне)»**.
+- Запрос, отправленный сразу после старта (0,6 с): дождался models по границе
+  `SEMANTIC_READY_WAIT_TIMEOUT`, вернул **keyword-fallback с пометкой** (isError=False),
+  НЕ таймаут и НЕ «connection closed». После прогрева `health`: **«Semantic search: ready»**.
+- Тёплые запросы (semantic/hybrid): **0,3–0,6 с**; «connection closed» не воспроизводится.
+
+### Опционально (вне scope)
+
+Отключение сетевых HEAD-запросов к HuggingFace при загрузке из кэша
+(`HF_HUB_OFFLINE=1`) сокращает холодный прогрев с ~12–22 с (из них ~10 с на
+HEAD-чеки) до ~4–5 с. Не реализовано — прогрев фоновый и не мешает клиенту.
