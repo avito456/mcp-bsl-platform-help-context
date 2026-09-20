@@ -40,7 +40,7 @@ class DocumentBuilder:
     """Converts domain entities to embeddable documents.
 
     Text format for each entity type:
-      Method:   "TypeName.MethodName\\nDescription\\nВозвращает: ReturnType\\nПараметры: p1, p2"
+      Method:   "TypeName.MethodName\\nDescription\\nВозвращает: ReturnType\\nПараметры: p1 (type), p2 (type)"
       Property: "TypeName.PropertyName\\nDescription\\nТип: PropertyType\\nТолько чтение"
       Type:     "TypeName\\nDescription\\nМетоды: m1, m2, ...\\nСвойства: p1, p2, ..."
     """
@@ -94,9 +94,12 @@ class DocumentBuilder:
 
         if method.signatures:
             for sig in method.signatures:
-                param_names = [p.name for p in sig.parameters]
-                if param_names:
-                    parts.append(f"Параметры: {', '.join(param_names)}")
+                params = ", ".join(
+                    p.name + (f" ({p.type})" if p.type else "")
+                    for p in sig.parameters
+                )
+                if params:
+                    parts.append(f"Параметры: {params}")
                     break  # one signature is enough for embedding context
 
         text = "\n".join(parts)

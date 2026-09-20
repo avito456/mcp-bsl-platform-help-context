@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 
 # Standard RRF constant from the original paper (Cormack et al., 2009).
 RRF_K = 60
+# Keyword-list contribution weight in RRF.
+# Measured on real 8.5.1 HBK data: the keyword engine already ranks exact
+# lexical hits first (stem + owner-type matching), so equal weights keep
+# semantic proximity from being flooded by the keyword side.  Values above
+# ~1.2 measurably hurt this ranking, so keep this near 1.0.
+KEYWORD_WEIGHT = 1.0
 # How much broader the sub-searches run than the final limit.
 HYBRID_FETCH_MULTIPLIER = 3
 # How many merged candidates are fed to the reranker.
@@ -34,14 +40,17 @@ class HybridSearchEngine:
     Algorithm:
       1. Run keyword search → ranked list A
       2. Run semantic search → ranked list B
-      3. For each document d, score(d) = Σ 1/(k + rank_i(d))
+      3. For each document d, score(d) = KEYWORD_WEIGHT·Σ_{A} 1/(k + rank_A(d))
+         + Σ_{B} 1/(k + rank_B(d))
       4. Deduplicate by name
       5. Optionally rerank top candidates with cross-encoder
       6. Return top-limit results
 
     RRF is scale-invariant — it doesn't depend on score magnitudes from
     either engine, only on the rank positions.  Documents found by both
-    engines naturally receive higher fused scores.
+    engines naturally receive higher fused scores.  The keyword weight is a
+    tunable knob (measured optimal near 1.0); exact lexical hits are
+    prioritised by the keyword engine itself rather than by fusing weights.
     """
 
     def __init__(
@@ -79,9 +88,11 @@ class HybridSearchEngine:
         keyword_query = SearchQuery(query=query, type=api_type, limit=fetch_limit)
         keyword_results = self._keyword.search(keyword_query)
 
-        # 2. Semantic search
+        # 2. Semantic search (raw ANN ranking — the cross-encoder rerank
+        # happens once on the merged pool below, so keyword evidence is
+        # combined with semantics before ordering).
         semantic_results = self._semantic.search(
-            query, storage, limit=fetch_limit, type_filter=type_filter
+            query, storage, limit=fetch_limit, type_filter=type_filter, rerank=False
         )
 
         # 3. RRF merge
@@ -111,10 +122,11 @@ class HybridSearchEngine:
     ) -> list[Definition]:
         """Merge two ranked lists using Reciprocal Rank Fusion.
 
-        Each document receives score = Σ 1/(RRF_K + rank) from each list
-        where it appears.  Results are sorted by fused score descending
-        and deduplicated by a type-aware key, so members of different
-        types with the same name are never collapsed.
+        Each document receives score = KEYWORD_WEIGHT·1/(RRF_K + rank_A)
+        + 1/(RRF_K + rank_B) from each list where it appears.  Results are
+        sorted by fused score descending and deduplicated by a type-aware
+        key, so members of different types with the same name are never
+        collapsed.
         """
         owner = member_owner or {}
         scores: dict[tuple[str, str, str], float] = {}
@@ -122,7 +134,9 @@ class HybridSearchEngine:
 
         for rank, defn in enumerate(list_a):
             key = _definition_key(defn, owner)
-            scores[key] = scores.get(key, 0.0) + 1.0 / (RRF_K + rank + 1)
+            scores[key] = (
+                scores.get(key, 0.0) + KEYWORD_WEIGHT / (RRF_K + rank + 1)
+            )
             items.setdefault(key, defn)
 
         for rank, defn in enumerate(list_b):

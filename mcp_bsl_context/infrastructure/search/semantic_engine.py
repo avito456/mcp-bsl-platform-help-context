@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 COLLECTION_NAME = "platform_context"
 UPSERT_BATCH_SIZE = 100
 FINGERPRINT_FILE = "index-fingerprint.json"
-# Changed to force reindexing after the embed-text format gained EN aliases.
-_FINGERPRINT_NAMESPACE = uuid.UUID("8f0b2c9d-2a3e-4b4f-9dae-4f6a8c1c0e10")
+# Bumped again (embed-text now includes parameter types in DocumentBuilder).
+_FINGERPRINT_NAMESPACE = uuid.UUID("c1e7a9f3-5b8d-4e2a-9c04-1f6b2d3e4a55")
 # How many more candidates to fetch than requested so the reranker has room.
 SEMANTIC_FETCH_MULTIPLIER = 3
 
@@ -93,6 +93,7 @@ class SemanticSearchEngine:
         storage: PlatformContextStorage,
         limit: int = 10,
         type_filter: str | None = None,
+        rerank: bool = True,
     ) -> list[Definition]:
         """Semantic search: embed query -> Qdrant ANN -> optional rerank.
 
@@ -101,13 +102,19 @@ class SemanticSearchEngine:
             storage: Platform context storage (for lazy init).
             limit: Maximum results to return.
             type_filter: Optional filter by api_type ("method"/"property"/"type").
+            rerank: If True (and a reranker is configured), reorder the ANN
+                results with the cross-encoder before returning.  The hybrid
+                engine passes False here — it fetches the raw ANN ranking and
+                applies a single rerank on the merged pool instead, so keyword
+                and semantic evidence are combined before ranking.
 
         Returns:
             Ordered list of Definition objects (most relevant first).
         """
         self.ensure_ready(storage)
 
-        search_limit = limit * SEMANTIC_FETCH_MULTIPLIER if self._reranker else limit
+        use_rerank = self._reranker is not None and rerank
+        search_limit = limit * SEMANTIC_FETCH_MULTIPLIER if use_rerank else limit
         query_vector = self._embedder.embed_query(query)
 
         qdrant_filter = None
@@ -133,8 +140,8 @@ class SemanticSearchEngine:
         if not results:
             return []
 
-        # Rerank candidates if reranker is available
-        if self._reranker and len(results) > 1:
+        # Rerank candidates if reranker is available (and requested)
+        if use_rerank and len(results) > 1:
             texts = [hit.payload.get("text", "") for hit in results]
             reranked = self._reranker.rerank(query, texts, top_k=limit)
             definitions: list[Definition] = []

@@ -77,7 +77,7 @@ class TestSearchToolEmptyResult:
         _write_context(tmp_path)
         search = _make_search_tool(tmp_path)
 
-        output = search(query="Сообщитьv", mode="keyword")
+        output = search(query="Ссобщить", mode="keyword")
 
         assert "Внутренняя ошибка" not in output
         assert "Возможно, вы имели в виду" in output

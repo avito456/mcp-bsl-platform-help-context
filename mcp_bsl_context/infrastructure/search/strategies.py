@@ -48,6 +48,42 @@ def _split_words(text: str) -> list[str]:
     return [w.lower() for w in words if w]
 
 
+def word_weight(word: str) -> int:
+    """Importance of a query word for ranking matches.
+
+    Short function words ('в', 'по', 'как') add almost nothing, so results
+    matched only by them stop ranking above content-bearing matches.  Longer
+    words (Russian stems, 6+ chars) weigh the most.
+    """
+    length = len(word)
+    if length <= 1:
+        return 0
+    if length == 2:
+        return 1
+    if length <= 5:
+        return 3
+    return 5
+
+
+def word_matches(word: str, alias_lower: str) -> bool:
+    """Check whether a query word hits an alias (already lowercased).
+
+    Two ways to hit:
+      * substring — exact token or inflected prefix, e.g. 'значений'
+        lands in 'таблицазначений';
+      * Russian word-form stem — drop the trailing letters and check the
+        stem still overlaps the alias, e.g. 'строку' → 'стро' hits
+        'найтистроки', 'условию' → 'услов' hits 'условиенахождения'.
+    """
+    if word in alias_lower:
+        return True
+    if len(word) >= 5:
+        stem = word[:-2]
+        if len(stem) >= 3 and stem in alias_lower:
+            return True
+    return False
+
+
 class CompoundTypeSearch:
     """Priority 1: Multi-word type queries — joins words into compound type names."""
 
@@ -261,6 +297,13 @@ class WordOrderSearch:
     with fully-matching words skip a full scan of every definition.  When a
     query word is not present as an exact token (partial/suffix matches), the
     search falls back to the historical substring scan to preserve results.
+
+    Matching accounts for Russian word forms: a word matches an alias by
+    substring or by a shared stem prefix (``строку`` ≈ ``строки``).  Type
+    members also match against their owner type name, so queries that
+    mention the type rank that type's members higher.  Results are ranked
+    by the weighted sum of matched query words (see :func:`word_weight`),
+    so short function words cannot outrank content-bearing matches.
     """
 
     priority = 4
@@ -294,12 +337,20 @@ class WordOrderSearch:
         ) -> None:
             if api_type is not None and expected_type is not None and api_type != expected_type:
                 return
+            effective_owner = owner.get(id(item), type_name)
+            # Type members match against their own aliases AND the owner
+            # type name, so a query mentioning the type ('строка в таблице
+            # значений') boosts that type's members above same-name members
+            # of other types.
             names_lower = [n.lower() for n in definition_names(item)]
+            if effective_owner:
+                names_lower.append(effective_owner.lower())
             matched = sum(
-                1 for w in words if any(w in nl for nl in names_lower)
+                word_weight(w)
+                for w in words
+                if any(word_matches(w, nl) for nl in names_lower)
             )
             if matched > 0:
-                effective_owner = owner.get(id(item), type_name)
                 key = definition_key(item, effective_owner)
                 if key not in seen:
                     seen.add(key)

@@ -71,7 +71,7 @@ class TestMethodDocument:
             ],
         )
         doc = builder.build_from_method(method)
-        assert "Параметры: Значение, Колонки" in doc.text
+        assert "Параметры: Значение (Произвольный), Колонки (Строка)" in doc.text
 
     def test_method_without_description(self, builder):
         method = MethodDefinition(name="Тест", description="")

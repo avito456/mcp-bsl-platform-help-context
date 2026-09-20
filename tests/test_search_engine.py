@@ -156,6 +156,44 @@ class TestSimpleSearchEngine:
         names = [r.name for r in results]
         assert names.count("Добавить") >= 2  # ТаблицаЗначений + Массив
 
+    def test_word_form_matches_inflection(self):
+        """'строку' must match 'НайтиСтроки' via the shared stem 'стро'."""
+        types = [
+            PlatformTypeDefinition(
+                name="ТаблицаЗначений",
+                description="Таблица значений",
+                methods=[
+                    MethodDefinition(name="НайтиСтроки", description="Найти строки по условию"),
+                    MethodDefinition(name="Вставить", description="Вставить строку"),
+                ],
+            )
+        ]
+        engine = self._make_engine(types=types)
+        results = engine.search(SearchQuery(query="строку"))
+        names = [r.name for r in results]
+        assert "НайтиСтроки" in names
+        assert "Вставить" not in names
+
+    def test_inflected_words_outrank_short_function_words(self):
+        """Content words rank first; 'в'-only matches are dropped."""
+        types = [
+            PlatformTypeDefinition(
+                name="ТаблицаЗначений",
+                description="Таблица значений",
+                methods=[
+                    MethodDefinition(name="НайтиСтроки", description="Найти строки по условию"),
+                    MethodDefinition(name="Вставить", description="Вставить строку"),
+                ],
+            )
+        ]
+        engine = self._make_engine(types=types)
+        results = engine.search(
+            SearchQuery(query="как найти строку в таблице значений по условию")
+        )
+        names = [r.name for r in results]
+        assert "НайтиСтроки" in names[:2]
+        assert names.index("НайтиСтроки") < names.index("Вставить")
+
     def test_members_of_different_types_not_collapsed(self, sample_types):
         """C1: dedup must not collapse same-name members of different types."""
         engine = self._make_engine(types=sample_types)
