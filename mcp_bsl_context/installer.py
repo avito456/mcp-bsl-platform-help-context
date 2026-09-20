@@ -4,8 +4,8 @@ Registers the server (project scope) in the target project and adds the
 AI-agent usage guide to its AGENTS.md / CLAUDE.md.
 
 Targets:
-  - opencode  -> opencode.jsonc   (mcp."bsl-context", type=local)
-  - Claude Code -> .mcp.json      (mcpServers."bsl-context", type=stdio)
+  - opencode  -> opencode.jsonc   (mcp."bsl-context-1c", type=local)
+  - Claude Code -> .mcp.json      (mcpServers."bsl-context-1c", type=stdio)
 
 CLI entry points: ``mcp-bsl-context install`` / ``mcp-bsl-context uninstall``
 (see ``mcp_bsl_context.__main__``).
@@ -21,7 +21,9 @@ from importlib.resources import files as _resources_files
 from pathlib import Path
 from typing import Literal
 
-SERVER_NAME = "bsl-context"
+SERVER_NAME = "bsl-context-1c"
+CLI_COMMAND = "mcp-bsl-context"
+CONFIG_INSTALL_MARKER = "# Создан инсталлятором mcp-bsl-context."
 MARKER_START = "<!-- MCP-BSL-CONTEXT:START -->"
 MARKER_END = "<!-- MCP-BSL-CONTEXT:END -->"
 OPENCODE_SCHEMA = "https://opencode.ai/config.json"
@@ -432,7 +434,7 @@ def generate_config(
 def _opencode_command(server_repo: Path, target: Path) -> list[str]:
     return [
         "uv", "run", "--project", str(server_repo),
-        "mcp-bsl-context", "-c", str(target / "config.yml"),
+        CLI_COMMAND, "-c", str(target / "config.yml"),
     ]
 
 
@@ -441,7 +443,7 @@ def _claude_entry(server_repo: Path, target: Path) -> dict:
         "type": "stdio",
         "command": "uv",
         "args": ["run", "--project", str(server_repo),
-                 "mcp-bsl-context", "-c", str(target / "config.yml")],
+                 CLI_COMMAND, "-c", str(target / "config.yml")],
     }
 
 
@@ -559,7 +561,7 @@ def _print_verification(scope: Scope) -> None:
     if scope != "claude":
         print("  opencode      -> opencode mcp list")
     if scope != "opencode":
-        print("  claude code   -> claude mcp get bsl-context   (or claude mcp list)")
+        print("  claude code   -> claude mcp get bsl-context-1c   (or claude mcp list)")
     print()
     print("Notes:")
     print("  - 'uv' must be installed and on PATH for both clients.")
@@ -600,6 +602,25 @@ def run_install(
     return actions
 
 
+def remove_config(target: Path, dry_run: bool, actions: list) -> None:
+    """Remove ``config.yml`` if (and only if) it was created by the installer.
+
+    A pre-existing user config (no install marker in the header) is left
+    as-is — the installer never overwrites files it did not create.
+    """
+    cfg = target / "config.yml"
+    if not cfg.is_file():
+        actions.append(("skip", cfg, "not found"))
+        return
+    text = cfg.read_text(encoding="utf-8")
+    if CONFIG_INSTALL_MARKER not in text:
+        actions.append(("skip", cfg, "not created by installer, left as-is"))
+        return
+    if not dry_run:
+        cfg.unlink()
+    actions.append(("remove", cfg, "installer-generated config removed"))
+
+
 def run_uninstall(target: Path, scope: Scope, dry_run: bool) -> list:
     """Remove the installer's own changes; returns the list of actions."""
     actions: list = []
@@ -609,4 +630,5 @@ def run_uninstall(target: Path, scope: Scope, dry_run: bool) -> list:
         remove_opencode(target, dry_run, actions)
     if scope != "opencode":
         remove_claude(target, dry_run, actions)
+    remove_config(target, dry_run, actions)
     return actions
