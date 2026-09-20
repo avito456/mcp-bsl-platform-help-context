@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import importlib.resources as pkg_resources
 import functools
+import importlib.resources as pkg_resources
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Any, Callable
