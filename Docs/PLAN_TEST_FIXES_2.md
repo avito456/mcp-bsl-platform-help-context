@@ -12,7 +12,7 @@
 | D2 | Средняя | Мусорный запрос `ЖирафКосмическийПолетКвантовый` → топ-1 «Шрифт.Полужирный»; did-you-mean не срабатывает | `strategies.py::word_matches`: (1) свободная подстрока в середине слова (`жираф` ⊂ `Полужирный`); (2) наивный стеммер `word[:-2]` (`полет`→`поле` ⊂ `ПолеКомпоновкиДанных`) | ✅ |
 | D3 | Средняя | Разовый `MCP error -32000: Connection closed` на semantic/hybrid через opencode; инструменты сервера исчезают | **PyTorch на Apple MPS жёстко abort()рует процесс** (`MTLReleaseAssertionFailure` → SIGABRT; stack: `torch::arange` → `at::mps::MPSStream`). Crash-reports от 2026-09-20 (16:14, 16:39; родитель `uv`). Эмбеддинги/реранкер создаются без `device` → sentence-transformers 6.1 выбирает MPS; abort ≠ перехватываемое исключение → процесс умирает → EOF на stdout → opencode отключает сервер | ✅ |
 | D4 | Низкая | `get_platform_info`: «Available versions (4)» с 8.5.1 ×3 | `VersionDiscovery.discover` возвращает запись на билд (`8.5.1.1150/1343/1423`), все нормализуются в `PlatformVersion('8.5.1')`; дедупликации нет | ✅ |
-| D5 | Низкая | Заголовки markdown англ. (`Methods`/`Properties`/`Constructors`) в русском тексте; закреплено в `test_formatter.py` | `presentation/formatter.py:84,86,112` | ⏳ |
+| D5 | Низкая | Заголовки markdown англ. (`Methods`/`Properties`/`Constructors`) в русском тексте; закреплено в `test_formatter.py` | `presentation/formatter.py:84,86,112` | ✅ |
 
 ## Шаги
 

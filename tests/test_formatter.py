@@ -57,8 +57,8 @@ class TestMarkdownFormatter:
         )
         result = self.formatter.format_member(t)
         assert "ТаблицаЗначений" in result
-        assert "Methods" in result
-        assert "Properties" in result
+        assert "Методы" in result
+        assert "Свойства" in result
 
     def test_format_method_with_params(self):
         method = MethodDefinition(
@@ -101,7 +101,7 @@ class TestMarkdownFormatter:
             )
         ]
         result = self.formatter.format_constructors(ctors, "Массив")
-        assert "Constructors for Массив" in result
+        assert "Конструкторы для Массив" in result
         assert "Размер" in result
 
     def test_format_constructors_empty(self):
@@ -114,8 +114,8 @@ class TestMarkdownFormatter:
             PropertyDefinition(name="P1", description="property"),
         ]
         result = self.formatter.format_type_members(members)
-        assert "Methods" in result
-        assert "Properties" in result
+        assert "Методы" in result
+        assert "Свойства" in result
         assert "M1" in result
         assert "P1" in result
 

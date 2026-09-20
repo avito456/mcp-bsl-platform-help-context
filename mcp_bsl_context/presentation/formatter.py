@@ -81,7 +81,7 @@ class MarkdownFormatter:
         parts: list[str] = []
 
         if methods:
-            parts.append("## Methods\n")
+            parts.append("## Методы\n")
             for m in methods:
                 parts.append(f"- **{self._escape_inline(m.name)}**")
                 if m.description:
@@ -91,7 +91,7 @@ class MarkdownFormatter:
             parts.append("")
 
         if properties:
-            parts.append("## Properties\n")
+            parts.append("## Свойства\n")
             for p in properties:
                 ro = " *(read-only)*" if p.is_read_only else ""
                 parts.append(f"- **{self._escape_inline(p.name)}**{ro}")
@@ -114,7 +114,7 @@ class MarkdownFormatter:
             return f"Type **{self._escape_inline(type_name)}** has no constructors.\n"
 
         parts: list[str] = [
-            f"## Constructors for {self._escape_inline(type_name)}\n"
+            f"## Конструкторы для {self._escape_inline(type_name)}\n"
         ]
 
         for ctor in constructors:
@@ -146,7 +146,7 @@ class MarkdownFormatter:
             parts.append("")
 
         if type_def.has_methods():
-            parts.append(f"**Methods ({len(type_def.methods)}):**\n")
+            parts.append(f"**Методы ({len(type_def.methods)}):**\n")
             for m in type_def.methods[:10]:
                 parts.append(f"- `{m.name}`")
             if len(type_def.methods) > 10:
@@ -154,7 +154,7 @@ class MarkdownFormatter:
             parts.append("")
 
         if type_def.has_properties():
-            parts.append(f"**Properties ({len(type_def.properties)}):**\n")
+            parts.append(f"**Свойства ({len(type_def.properties)}):**\n")
             for p in type_def.properties[:10]:
                 parts.append(f"- `{p.name}`")
             if len(type_def.properties) > 10:
@@ -162,7 +162,7 @@ class MarkdownFormatter:
             parts.append("")
 
         if type_def.constructors:
-            parts.append(f"**Constructors ({len(type_def.constructors)}):**\n")
+            parts.append(f"**Конструкторы ({len(type_def.constructors)}):**\n")
 
         return "\n".join(parts)
 
