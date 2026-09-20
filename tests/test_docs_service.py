@@ -150,6 +150,26 @@ class TestSearchStrictTyping:
         # Should contain context around the match
         assert "..." in result or "конструктор" in result.lower()
 
+    def test_multi_word_falls_back_to_any_word(self, service):
+        # «Массив конструктор» не встречается подряд, но токены есть в разных
+        # темах — поиск должен вернуть обе (с пометкой о частичном совпадении).
+        result = service.search_strict_typing("Массив конструктор")
+        assert "arrays" in result
+        assert "constructor-functions" in result
+        assert "совпало 1 из 2 слов" in result
+
+    def test_multi_word_topics_exact_match_first(self, service):
+        result = service.search_strict_typing("массив типизирован")
+        # Только arrays содержит оба слова — он должен быть единственным.
+        assert "arrays" in result
+        assert "constructor-functions" not in result
+        assert "1 совпадение" in result
+
+    def test_multi_word_ignores_punctuation(self, service):
+        result = service.search_strict_typing("Массив, конструктор!")
+        assert "arrays" in result
+        assert "constructor-functions" in result
+
 
 class TestLazyParsing:
     def test_topics_not_parsed_until_access(self):
