@@ -215,3 +215,38 @@ class TestSimpleSearchEngine:
         names = [r.name for r in results]
         assert names
         assert all(r.name == "Добавить" for r in results)  # только методы, никаких свойств
+
+    def test_garbage_only_query_returns_empty(self, sample_methods):
+        """A query without any recognizable word yields no results."""
+        engine = self._make_engine(methods=sample_methods)
+        assert engine.search(SearchQuery(query="абракадабра")) == []
+
+    def test_noise_word_does_not_outrank_real(self, sample_methods):
+        """D2: длинный мусорный токен рядом с реальным именем не поднимает
+        чужие результаты выше точного совпадения — 'НайтиПоСсылке' остаётся
+        первым."""
+        engine = self._make_engine(methods=sample_methods)
+        names = [r.name for r in engine.search(SearchQuery(query="НайтиПоСсылке хухрымухры"))]
+        assert names and names[0] == "НайтиПоСсылке"
+
+    def test_pure_noise_query_returns_empty(self, sample_methods):
+        """D2: запрос, не содержащий ни одного узнаваемого слова, даёт пусто."""
+        engine = self._make_engine(methods=sample_methods)
+        assert engine.search(SearchQuery(query="хухрымухры брабрабра")) == []
+
+    def test_segment_precise_word_form(self, sample_methods):
+        """'строку' → 'строк' matches the 'строки' segment of НайтиСтроки."""
+        types = [
+            PlatformTypeDefinition(
+                name="ТаблицаЗначений",
+                description="",
+                methods=[
+                    MethodDefinition(name="НайтиСтроки", description=""),
+                    MethodDefinition(name="Вставить", description=""),
+                ],
+            )
+        ]
+        engine = self._make_engine(types=types)
+        names = [r.name for r in engine.search(SearchQuery(query="строку"))]
+        assert "НайтиСтроки" in names
+        assert "Вставить" not in names

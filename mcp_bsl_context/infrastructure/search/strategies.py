@@ -65,21 +65,62 @@ def word_weight(word: str) -> int:
     return 5
 
 
+_RUSSIAN_TAILS = (
+    "ого", "его", "ому", "ему", "ими", "ыми", "ой", "ей", "ая", "яя",
+    "ое", "ее", "ый", "ий", "ом", "ем", "ах", "ях", "ов", "ев", "ам",
+    "ям", "ами", "ями", "ую", "юю",
+)
+
+
+def _russian_stem(word: str) -> str:
+    """Reduce a Russian word to a short stem by trimming a short tail.
+
+    Only the ending is touched (агглютинативная эвристика, как задумано):
+    ``строку → строк``, ``условию → услов``, ``значений → значен``.
+    Non-Russian words pass through unchanged as long stems cut to 3+ chars
+    would match nothing anyway.
+    """
+    if len(word) < 4:
+        return word
+    for tail in _RUSSIAN_TAILS:
+        if word.endswith(tail) and len(word) - len(tail) >= 3:
+            return word[: -len(tail)]
+    for ch in "ьйаяу юоыеёыи":
+        if ch and word.endswith(ch) and len(word) > 3:
+            return word[:-1]
+    return word
+
+
 def word_matches(word: str, alias_lower: str) -> bool:
     """Check whether a query word hits an alias (already lowercased).
 
-    Two ways to hit:
-      * substring — exact token or inflected prefix, e.g. 'значений'
-        lands in 'таблицазначений';
-      * Russian word-form stem — drop the trailing letters and check the
-        stem still overlaps the alias, e.g. 'строку' → 'стро' hits
-        'найтистроки', 'условию' → 'услов' hits 'условиенахождения'.
+    Matching is segment-precise first, loose last:
+      * exact substring or exact camelCase segment (``'строки'`` in
+        ``'найтистроки'``);
+      * Russian word-form stem that is a prefix of a camelCase segment
+        (``'строку'`` → ``'строк'`` starts ``'строки'``);
+      * historical full substring with a chopped tail (``'значений'`` →
+        ``'значен'`` lands in ``'таблицазначений'``).
+
+    Free substrings that are not rooted in a segment boundary never match
+    on their own, which keeps typos and noise from fanning out.
     """
     if word in alias_lower:
         return True
+    if not word:
+        return False
+
+    segments = _split_words(alias_lower)
+    if word in segments:
+        return True
+
+    stem = _russian_stem(word)
+    if len(stem) >= 3 and any(seg.startswith(stem) for seg in segments):
+        return True
+
     if len(word) >= 5:
-        stem = word[:-2]
-        if len(stem) >= 3 and stem in alias_lower:
+        tail = word[:-2]
+        if len(tail) >= 3 and tail in alias_lower:
             return True
     return False
 
@@ -350,13 +391,14 @@ class WordOrderSearch:
                 for w in words
                 if any(word_matches(w, nl) for nl in names_lower)
             )
-            if matched > 0:
-                key = definition_key(item, effective_owner)
-                if key not in seen:
-                    seen.add(key)
-                    results.append(
-                        SearchResult(item, self.priority, matched, effective_owner)
-                    )
+            if matched == 0:
+                return
+            key = definition_key(item, effective_owner)
+            if key not in seen:
+                seen.add(key)
+                results.append(
+                    SearchResult(item, self.priority, matched, effective_owner)
+                )
 
         pool = self._pool(all_methods, all_properties, all_types, all_members)
         index = self._get_index(
