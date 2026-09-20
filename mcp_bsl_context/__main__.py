@@ -154,7 +154,6 @@ def _run_uninstall(project: str | None, scope: installer.Scope, dry_run: bool) -
     actions = installer.run_uninstall(target, scope, dry_run)
     click.echo()
     installer._print_actions(actions)
-    click.echo("\n'config.yml' was left as-is; delete it manually if desired.")
 
 
 @click.group(invoke_without_command=True)
@@ -325,7 +324,7 @@ def install(
     yes: bool,
     non_interactive: bool,
 ) -> None:
-    """Register 'bsl-context' in a target project (project scope).
+    """Register 'bsl-context-1c' in a target project (project scope).
 
     On an interactive terminal a wizard asks only for values that could not
     be resolved automatically.
