@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "bsl-context": {
+    "bsl-context-1c": {
       "type": "stdio",
       "command": "uv",
       "args": [

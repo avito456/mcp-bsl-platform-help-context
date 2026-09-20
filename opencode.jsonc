@@ -10,7 +10,7 @@
       ],
       "enabled": true
     },
-    "bsl-context": {
+    "bsl-context-1c": {
       "type": "local",
       "command": [
         "uv",
