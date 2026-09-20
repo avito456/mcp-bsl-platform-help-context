@@ -34,7 +34,9 @@ def wizard(monkeypatch):
 def no_platform_hints(monkeypatch, tmp_path) -> None:
     """Prevent auto-resolution from the environment/built-in hbk/repo."""
     monkeypatch.delenv("MCP_BSL_PLATFORM_PATH", raising=False)
-    monkeypatch.setattr("mcp_bsl_context.installer.COMMON_PLATFORM_DIRS", [])
+    monkeypatch.setattr(
+        "mcp_bsl_context.installer._os_platform_candidate_dirs", lambda: []
+    )
 
 
 @pytest.fixture
@@ -242,3 +244,62 @@ def test_os_candidate_dirs_per_platform(tmp_path, monkeypatch) -> None:
     darwin = _os_platform_candidate_dirs()
     assert darwin[0] == tmp_path / "Applications/1cv8"
     assert [p.name for p in darwin] == ["1cv8", "1cv8", "1cv8"]
+
+
+def test_wizard_selects_version_by_number(tmp_path, runner, wizard, no_platform_hints) -> None:
+    root = tmp_path / "pf"
+    _write_version(root, "8.3.20.1234", with_bin=True)
+    _write_version(root, "8.3.27.72")
+    result = runner.invoke(
+        cli,
+        ["install", "--project", str(tmp_path), "--repo", _empty_repo(tmp_path)],
+        input=f"{root}\n2\ny\n",
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    cfg = (tmp_path / "config.yml").read_text(encoding="utf-8")
+    assert 'version: "8.3.27"' in cfg
+    assert "1. 8.3.20" in result.output
+    assert "2. 8.3.27" in result.output
+
+
+def test_wizard_os_scan_finds_platform(tmp_path, runner, wizard, monkeypatch) -> None:
+    empty = tmp_path / "empty-os-dir"
+    empty.mkdir()
+    real = tmp_path / "real"
+    _write_version(real, "8.3.27.72")
+    monkeypatch.setattr(
+        "mcp_bsl_context.installer._os_platform_candidate_dirs",
+        lambda: [empty, real],
+    )
+    result = runner.invoke(
+        cli,
+        ["install", "--project", str(tmp_path), "--repo", _empty_repo(tmp_path)],
+        input="y\n",
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    cfg = (tmp_path / "config.yml").read_text(encoding="utf-8")
+    assert f"path: {json.dumps(str(real))}" in cfg
+    assert 'version: "8.3.27"' in cfg
+    assert "Найдена платформа 1С" in result.output
+
+
+def test_wizard_asks_hbk_dir_when_no_installed_platforms(
+    tmp_path, runner, wizard, no_platform_hints
+) -> None:
+    bad = tmp_path / "no-hbk"
+    bad.mkdir()
+    root = tmp_path / "pf"
+    _write_version(root, "8.3.27.72")
+    result = runner.invoke(
+        cli,
+        ["install", "--project", str(tmp_path), "--repo", _empty_repo(tmp_path)],
+        input=f"{bad}\n{root}\ny\n",
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0, result.output
+    cfg = (tmp_path / "config.yml").read_text(encoding="utf-8")
+    assert f"path: {json.dumps(str(root))}" in cfg
+    assert "не найден файл справки" in result.output
+    assert "Укажите каталог с файлом справки платформы 1С (*.hbk)" in result.output

@@ -123,7 +123,7 @@ mcp-bsl-context -c config.yml
 
 | CLI-аргумент | Переменная окружения | По умолчанию |
 |---|---|---|
-| `--platform-path` | `MCP_BSL_PLATFORM_PATH` | (обязателен для hbk) |
+| `--platform-path` | `MCP_BSL_PLATFORM_PATH` | авто-поиск по ОС (hbk) |
 | `--platform-version` | `MCP_BSL_PLATFORM_VERSION` | null (авто — последняя) |
 | `--mode` | `MCP_BSL_MODE` | `stdio` |
 | `--port` | `MCP_BSL_PORT` | `8080` |
@@ -148,6 +148,7 @@ mcp-bsl-context -c config.yml -p /opt/1cv8/x86_64              # YAML + CLI over
 ### CLI-параметры
 
 ```bash
+mcp-bsl-context                                 # Авто-поиск платформы по каталогам установки ОС
 mcp-bsl-context -p /opt/1cv8/x86_64                            # Автоопределение последней версии
 mcp-bsl-context -p /opt/1cv8/x86_64 --platform-version 8.3.20  # Ближайшая к 8.3.20
 mcp-bsl-context -p /path -m streamable-http --port 8080         # Streamable HTTP транспорт
@@ -155,6 +156,14 @@ mcp-bsl-context -p /path --data-source json --json-path /path   # JSON исто�
 mcp-bsl-context -p /path --reindex                              # Пересборка семантического индекса
 mcp-bsl-context -p /path --warmup                               # Прогрев семантики при старте (без пересборки)
 ```
+
+Если источник `hbk`, а `platform.path` не задан (ни в `config.yml`, ни через
+`--platform-path`/`MCP_BSL_PLATFORM_PATH`), сервер при старте ищет
+установленную платформу 1С: сначала встроенный HBK в репозитории сервера,
+затем каталоги установки текущей ОС (macOS: `~/Applications/1cv8`,
+`/Applications/1cv8`, `/opt/1cv8`; Linux: `/opt/1cv8[/x86_64]`; Windows:
+`C:/Program Files/1cv8`). Если она не найдена — ошибка конфигурации с
+просьбой указать `--platform-path`.
 
 ## Интеграция
 
@@ -177,14 +186,17 @@ uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить
 На интерактивном терминале голый `install` запускает мастер и спрашивает
 только то, что не удалось определить автоматически:
 
-1. **Каталог платформы 1С** — если он не найден сам, программа определяет ОС
-   и предлагает типовой каталог (`/opt/1cv8/x86_64` на Linux,
-   `C:/Program Files/1cv8` на Windows, `~/Applications/1cv8` на macOS);
-2. **Версия 1С** — при нескольких установленных версиях показывается список,
-   Enter выбирает последнюю; можно ввести свою (например `8.3.20`) или
-   `auto` (не фиксировать версию). Версия записывается в `config.yml`
-   как `platform.version`;
-3. **Подтверждение записи** — Enter подтверждает.
+1. **Каталог платформы 1С** — ищется по каталогам установки текущей ОС
+   (`~/Applications/1cv8`, `/Applications/1cv8`, `/opt/1cv8` на macOS,
+   `/opt/1cv8/x86_64`, `/opt/1cv8` на Linux, `C:/Program Files/1cv8` на Windows);
+   если найдены установленные версии, печатается их нумерованный список;
+2. **Версия 1С** — выбирается по номеру из списка, вводом значения (например
+   `8.3.20`), Enter — последняя, или `auto` (не фиксировать версию). Версия
+   записывается в `config.yml` как `platform.version`;
+3. **Каталог с файлом справки `*.hbk`** — если установленных платформ не
+   найдено, мастер спрашивает каталог с файлом справки (например каталог
+   версии с `shcntx_ru.hbk`) и проверяет, что в нём есть HBK;
+4. **Подтверждение записи** — Enter подтверждает.
 
 Команды выполняются из корня этого репозитория. Для запуска из любого каталога —
 с `--project <репо>`:

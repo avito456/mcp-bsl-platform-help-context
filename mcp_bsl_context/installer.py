@@ -28,13 +28,6 @@ OPENCODE_SCHEMA = "https://opencode.ai/config.json"
 
 Scope = Literal["opencode", "claude", None]
 
-COMMON_PLATFORM_DIRS = [
-    "/opt/1cv8/x86_64",
-    "/opt/1cv8",
-    "C:/Program Files/1cv8",
-    "C:/Program Files (x86)/1cv8",
-]
-
 
 def _os_platform_candidate_dirs() -> list[Path]:
     """Candidate 1C install roots for the current OS (best guess first)."""
@@ -258,6 +251,27 @@ def _bundled_hbk_dir(server_repo: Path) -> Path | None:
     return None
 
 
+def auto_resolve_platform_path(server_repo: Path | None = None) -> str | None:
+    """Auto-detect an installed 1C platform for server startup (OS-aware).
+
+    Priority: a bundled ``shcntx_ru.hbk`` in the server repository, then the
+    OS install dirs (mac: ~/Applications/1cv8, /Applications/1cv8, /opt/1cv8;
+    linux; win). Returns the first candidate root that yields platform
+    versions, or ``None`` when nothing is found.
+    """
+    repo = server_repo or resolve_server_repo(None)
+    bundled = _bundled_hbk_dir(repo)
+    if bundled:
+        return str(bundled)
+
+    from mcp_bsl_context.infrastructure.storage.version_discovery import VersionDiscovery
+
+    for cand in _os_platform_candidate_dirs():
+        if cand.is_dir() and VersionDiscovery().discover(cand):
+            return str(cand)
+    return None
+
+
 def resolve_platform_path(target: Path, server_repo: Path, cli_path: str | None) -> str:
     if cli_path:
         return str(Path(cli_path).expanduser().resolve())
@@ -270,10 +284,9 @@ def resolve_platform_path(target: Path, server_repo: Path, cli_path: str | None)
     bundled = _bundled_hbk_dir(server_repo)
     if bundled:
         return str(bundled)
-    for cand in COMMON_PLATFORM_DIRS:
-        p = Path(cand)
-        if p.is_dir():
-            return str(p)
+    for cand in _os_platform_candidate_dirs():
+        if cand.is_dir():
+            return str(cand)
     raise InstallerError(
         "Platform path not found. Pass it explicitly:\n"
         "  uv run mcp-bsl-context install --platform-path /opt/1cv8/x86_64\n"

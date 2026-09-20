@@ -15,6 +15,8 @@ from pathlib import Path
 from mcp_bsl_context import installer
 from mcp_bsl_context.installer import InstallerError
 
+logger = logging.getLogger(__name__)
+
 
 def _resolve_target(project: str | None) -> Path:
     if project:
@@ -61,6 +63,16 @@ def _run_server(
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         stream=sys.stderr,
     )
+    # Auto-resolve the platform path when it is not configured (hbk source):
+    # bundled HBK in the server repo / OS install dirs first.
+    if (
+        app_config.platform.data_source == "hbk"
+        and not app_config.platform.path
+    ):
+        auto = installer.auto_resolve_platform_path()
+        if auto:
+            app_config.platform.path = auto
+            logger.info("Auto-resolved platform.path: %s", auto)
     # Suppress noisy MCP SDK request logs (ListToolsRequest, etc.)
     if not app_config.server.verbose:
         logging.getLogger("mcp.server.lowlevel.server").setLevel(logging.WARNING)
