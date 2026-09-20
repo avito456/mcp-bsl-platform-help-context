@@ -87,18 +87,48 @@ def _run_server(
         )
 
 
+def _want_interactive(yes: bool, non_interactive: bool) -> bool:
+    """Interactive wizard runs only on a real TTY unless explicitly disabled."""
+    return not yes and not non_interactive and sys.stdin.isatty()
+
+
 def _run_install(
     project: str | None,
     platform_path: str | None,
+    platform_version: str | None,
     repo: str | None,
     scope: installer.Scope,
     dry_run: bool,
+    yes: bool,
+    non_interactive: bool,
 ) -> None:
     target = _resolve_target(project)
     server_repo = installer.resolve_server_repo(repo)
     dry_run_label = " (dry run, nothing written)" if dry_run else ""
     click.echo(f"Installing '{installer.SERVER_NAME}' into {target}{dry_run_label}\n")
-    actions = installer.run_install(target, server_repo, platform_path, scope, dry_run)
+
+    if _want_interactive(yes, non_interactive):
+        from mcp_bsl_context.interactive import confirm_install, interact_before_install
+
+        platform_path, platform_version = interact_before_install(
+            target, server_repo, platform_path, platform_version
+        )
+        if not dry_run and not yes:
+            summary = f"  платформа: {platform_path}"
+            if platform_version:
+                summary += f"  (версия {platform_version})"
+            summary += "\n  клиенты: opencode + claude"
+            if not confirm_install(summary):
+                raise click.ClickException("Установка отменена.")
+
+    actions = installer.run_install(
+        target,
+        server_repo,
+        platform_path,
+        scope,
+        dry_run,
+        platform_version=platform_version,
+    )
     click.echo()
     installer._print_actions(actions)
     if not dry_run:
@@ -232,6 +262,12 @@ def cli(
     "MCP_BSL_PLATFORM_PATH and existing config.yml.",
 )
 @click.option(
+    "--platform-version",
+    default=None,
+    help="Preferred 1C platform version (e.g. '8.3.20'); written into "
+    "generated config.yml. 'auto'/omitted = runtime picks the latest.",
+)
+@click.option(
     "--repo",
     default=None,
     help="Server repository path (used in 'uv run --project <repo>'). "
@@ -256,16 +292,36 @@ def cli(
     is_flag=True,
     help="Preview changes, write nothing.",
 )
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Accept all defaults, never prompt.",
+)
+@click.option(
+    "--non-interactive",
+    is_flag=True,
+    help="Never prompt (for CI/scripts): fail if a value cannot be auto-resolved.",
+)
 def install(
     project: str | None,
     platform_path: str | None,
+    platform_version: str | None,
     repo: str | None,
     scope: installer.Scope,
     dry_run: bool,
+    yes: bool,
+    non_interactive: bool,
 ) -> None:
-    """Register 'bsl-context' in a target project (project scope)."""
+    """Register 'bsl-context' in a target project (project scope).
+
+    On an interactive terminal a wizard asks only for values that could not
+    be resolved automatically.
+    """
     try:
-        _run_install(project, platform_path, repo, scope, dry_run)
+        _run_install(
+            project, platform_path, platform_version, repo, scope, dry_run, yes, non_interactive
+        )
     except InstallerError as exc:
         raise click.ClickException(str(exc)) from exc
 

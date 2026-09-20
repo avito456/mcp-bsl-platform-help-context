@@ -35,6 +35,31 @@ COMMON_PLATFORM_DIRS = [
     "C:/Program Files (x86)/1cv8",
 ]
 
+
+def _os_platform_candidate_dirs() -> list[Path]:
+    """Candidate 1C install roots for the current OS (best guess first)."""
+    home = Path.home()
+    if sys.platform.startswith("win"):
+        return [
+            Path("C:/Program Files/1cv8"),
+            Path("C:/Program Files (x86)/1cv8"),
+        ]
+    if sys.platform == "darwin":
+        return [
+            home / "Applications/1cv8",
+            Path("/Applications/1cv8"),
+            Path("/opt/1cv8"),
+        ]
+    return [
+        Path("/opt/1cv8/x86_64"),
+        Path("/opt/1cv8"),
+    ]
+
+
+def _os_platform_dir_candidates() -> list[Path]:
+    """Existing 1C install-root candidates (used as wizard defaults)."""
+    return [c for c in _os_platform_candidate_dirs() if c.is_dir()]
+
 DEFAULT_CONFIG_TEMPLATE = r"""# MCP BSL Platform Help Context — файл конфигурации
 # Создан инсталлятором mcp-bsl-context. Пути приведены к абсолютным.
 # Все параметры можно переопределить через переменные окружения (MCP_BSL_*) или CLI-аргументы.
@@ -334,7 +359,13 @@ def remove_section(path: Path, dry_run: bool, actions: list) -> None:
 # ---------------------------------------------------------------------------
 
 
-def generate_config(target: Path, platform_path: str, dry_run: bool, actions: list) -> None:
+def generate_config(
+    target: Path,
+    platform_path: str,
+    dry_run: bool,
+    actions: list,
+    version: str | None = None,
+) -> None:
     cfg = target / "config.yml"
     if cfg.exists():
         actions.append(("skip", cfg, "already exists, left as-is"))
@@ -345,6 +376,13 @@ def generate_config(target: Path, platform_path: str, dry_run: bool, actions: li
     if not pm:
         raise InstallerError("config template: platform 'path:' line not found")
     text = text[: pm.start()] + f'{pm.group(1)}path: {json.dumps(platform_path, ensure_ascii=False)}' + text[pm.end() :]
+
+    if version:
+        vm = re.search(r"(?m)^(\s*)version:\s*[^\n]*$", text)
+        if not vm:
+            raise InstallerError("config template: platform 'version:' line not found")
+        new_line = f"{vm.group(1)}version: {json.dumps(version, ensure_ascii=False)}"
+        text = text[: vm.start()] + new_line + text[vm.end() :]
 
     # MCP clients (opencode/Claude Code) spawn the server over stdio.
     server_header = text.find("server:")
@@ -372,7 +410,10 @@ def generate_config(target: Path, platform_path: str, dry_run: bool, actions: li
     _ensure_parent(cfg)
     if not dry_run:
         cfg.write_text(text, encoding="utf-8")
-    actions.append(("write", cfg, f"generated (platform={platform_path})"))
+    detail = f"platform={platform_path}"
+    if version:
+        detail += f", version={version}"
+    actions.append(("write", cfg, f"generated ({detail})"))
 
 
 def _opencode_command(server_repo: Path, target: Path) -> list[str]:
@@ -526,12 +567,16 @@ def run_install(
     platform_path: str | None,
     scope: Scope,
     dry_run: bool,
+    platform_version: str | None = None,
 ) -> list:
     """Apply the install steps; returns the list of actions. Prints progress."""
     actions: list = []
     resolved = resolve_platform_path(target, server_repo, platform_path)
-    print(f"  platform: {resolved}")
-    generate_config(target, resolved, dry_run, actions)
+    if platform_version:
+        print(f"  platform: {resolved} (version {platform_version})")
+    else:
+        print(f"  platform: {resolved}")
+    generate_config(target, resolved, dry_run, actions, version=platform_version)
     section = tools_section()
     for doc in _applications(scope, target):
         insert_section(doc, section, dry_run, actions)

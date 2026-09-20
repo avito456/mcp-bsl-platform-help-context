@@ -167,18 +167,34 @@ mcp-bsl-context -p /path --warmup                               # Прогрев
 в `AGENTS.md`/`CLAUDE.md` проекта.
 
 ```bash
-uv run mcp-bsl-context install                                  # в текущий каталог
+uv run mcp-bsl-context install                                  # в текущий каталог (интерактивно)
 uv run mcp-bsl-context install --project ../my-1c-app --platform-path /opt/1cv8/x86_64
 uv run mcp-bsl-context install --dry-run                        # предпросмотр без записи
+uv run mcp-bsl-context install --yes                            # все дефолты, без вопросов
 uv run mcp-bsl-context uninstall --project ../my-1c-app         # удалить регистрацию
 ```
+
+На интерактивном терминале голый `install` запускает мастер и спрашивает
+только то, что не удалось определить автоматически:
+
+1. **Каталог платформы 1С** — если он не найден сам, программа определяет ОС
+   и предлагает типовой каталог (`/opt/1cv8/x86_64` на Linux,
+   `C:/Program Files/1cv8` на Windows, `~/Applications/1cv8` на macOS);
+2. **Версия 1С** — при нескольких установленных версиях показывается список,
+   Enter выбирает последнюю; можно ввести свою (например `8.3.20`) или
+   `auto` (не фиксировать версию). Версия записывается в `config.yml`
+   как `platform.version`;
+3. **Подтверждение записи** — Enter подтверждает.
 
 Команды выполняются из корня этого репозитория. Для запуска из любого каталога —
 с `--project <репо>`:
 `uv run --project /path/to/mcp-bsl-platform-help-context mcp-bsl-context install --project /path/to/1c-project`
 
 Дополнительные флаги: `--repo <path>` (переопределить server-репо для
-генерируемых команд), `--opencode-only` / `--claude-only`, `--dry-run`.
+генерируемых команд), `--platform-version <версия>` (зафиксировать версию без
+вопросов), `--opencode-only` / `--claude-only`, `--dry-run`, `--yes`/`-y`
+(принять все дефолты, не спрашивать), `--non-interactive` (для CI: без вопросов,
+ошибка, если значение невозможно определить автоматически).
 
 Требуется `uv` на PATH. После установки проверьте: `opencode mcp list` и
 `claude mcp get bsl-context` (или `claude mcp list`). В Claude Code сервер из `.mcp.json`
