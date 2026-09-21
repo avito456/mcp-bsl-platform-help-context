@@ -8,7 +8,6 @@ not present (e.g. a source checkout without the data, or CI).
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 
 import pytest
@@ -28,7 +27,6 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def storage() -> PlatformContextStorage:
-    logging.disable(logging.CRITICAL)
     s = PlatformContextStorage(PlatformContextLoader(), DATA_DIR)
     s.ensure_loaded()
     return s

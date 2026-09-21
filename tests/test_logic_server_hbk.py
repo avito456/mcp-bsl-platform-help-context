@@ -14,7 +14,6 @@ repo directory `8.3.27.72` or the directory given in the environment variable
 from __future__ import annotations
 
 import asyncio
-import logging
 import os
 import re
 from pathlib import Path
@@ -60,7 +59,6 @@ def first_item(output: str) -> str:
 @pytest.fixture(scope="module")
 def tools() -> dict[str, callable]:
     """Server tool functions with a real HBK context, keyword mode only."""
-    logging.disable(logging.CRITICAL)
     assert HBK_DIR is not None
     config = load_config(
         config_path=None,

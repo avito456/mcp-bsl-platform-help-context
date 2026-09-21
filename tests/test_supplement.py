@@ -107,7 +107,6 @@ def test_supplement_contains_execute_with_signature() -> None:
 
 @pytest.fixture(scope="module")
 def hbk_storage():
-    import logging
     from mcp_bsl_context.infrastructure.storage.loader import PlatformContextLoader
     from mcp_bsl_context.infrastructure.storage.storage import PlatformContextStorage
 
@@ -115,7 +114,6 @@ def hbk_storage():
     hbk = data_dir / "shcntx_ru.hbk"
     if not hbk.exists():
         pytest.skip("real HBK data not present")
-    logging.disable(logging.CRITICAL)
     storage = PlatformContextStorage(PlatformContextLoader(), data_dir)
     storage.ensure_loaded()
     return storage

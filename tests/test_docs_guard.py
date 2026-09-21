@@ -10,7 +10,6 @@ Skipped when the real HBK data is not present.
 
 from __future__ import annotations
 
-import logging
 import re
 from pathlib import Path
 
@@ -89,7 +88,6 @@ TOKEN_RE = re.compile(r"[А-ЯЁA-Z][а-яёa-z]+(?:[А-ЯЁA-Z][а-яёa-z]+)+"
 
 
 def _real_names() -> set[str]:
-    logging.disable(logging.CRITICAL)
     from mcp_bsl_context.infrastructure.storage.loader import PlatformContextLoader
     from mcp_bsl_context.infrastructure.storage.storage import PlatformContextStorage
 

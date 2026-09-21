@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import logging
+from collections.abc import Iterator
+
 import pytest
+from loguru import logger as _loguru_logger
 
 from mcp_bsl_context.domain.entities import (
     MethodDefinition,
@@ -11,6 +15,24 @@ from mcp_bsl_context.domain.entities import (
     PropertyDefinition,
     Signature,
 )
+
+
+@pytest.fixture(autouse=True)
+def _quiet_logging() -> Iterator[None]:
+    """Silence application logging so captured test output stays clean.
+
+    The app logs through ``loguru`` (sinks to stderr), so ``logging.disable``
+    alone is not enough — the loguru sinks are dropped here. stdlib logging is
+    muted as well for third-party libraries that emit through it.
+    """
+    _loguru_logger.remove()
+    previous_disable = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+    try:
+        yield
+    finally:
+        logging.disable(previous_disable)
+        _loguru_logger.remove()
 
 
 @pytest.fixture
