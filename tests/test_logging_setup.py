@@ -91,6 +91,31 @@ class TestSetupLogging:
         logger.remove()
         assert list(tmp_path.iterdir()) == []
 
+    def test_stderr_is_colored_by_default(self, capsys):
+        setup_logging(AppConfig())
+        get_logger("tests").info("colored-line")
+        logger.remove()
+        assert "\x1b[" in capsys.readouterr().err
+
+    def test_stderr_colorize_can_be_disabled(self, capsys):
+        config = AppConfig()
+        config.logging.colorize = False
+        setup_logging(config)
+        get_logger("tests").info("plain-line")
+        logger.remove()
+        err = capsys.readouterr().err
+        assert "\x1b[" not in err
+        assert "plain-line" in err
+
+    def test_file_output_has_no_ansi(self, tmp_path):
+        log_file = tmp_path / "plain.log"
+        config = AppConfig()
+        config.logging.file = str(log_file)
+        setup_logging(config)
+        get_logger("tests").info("file-plain")
+        logger.remove()
+        assert "\x1b[" not in log_file.read_text(encoding="utf-8")
+
 
 class TestNormalizeLevel:
     def test_accepts_case_insensitive_standard_level(self):

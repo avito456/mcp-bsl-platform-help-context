@@ -91,12 +91,13 @@
   несуществующие имена API в документации.
 - **Логирование на loguru и лог моделей ИИ при старте.** Логи пишутся в
   stderr (stdout свободен для stdio JSON-RPC) в формате
-  `YYYY-MM-DD HH:mm:ss [LEVEL] module: message`, уровень `DEBUG` при
-  `--verbose`. При старте выводится сводка по моделям ИИ (режим поиска,
-  источник данных, embeddings/reranker, пути хранения); `api_key` никогда не
-  логируется. Опциональный файловый приёмник с ротацией включается секцией
-  `logging` (`file`/`rotation`/`retention`/`level`) или переменными
-  `MCP_BSL_LOG_*` (по умолчанию выключен).
+  `YYYY-MM-DD HH:mm:ss [LEVEL] module: message` с ANSI-цветом для всех
+  модулей (отключается `logging.colorize: false` / `MCP_BSL_LOG_COLORIZE`),
+  уровень `DEBUG` при `--verbose`. При старте выводится сводка по моделям ИИ
+  (режим поиска, источник данных, embeddings/reranker, пути хранения);
+  `api_key` никогда не логируется. Опциональный файловый приёмник с ротацией
+  включается секцией `logging` (`file`/`rotation`/`retention`/`level`) или
+  переменными `MCP_BSL_LOG_*` (по умолчанию выключен, файл без ANSI).
 
 ### Исправлено
 

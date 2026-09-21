@@ -139,17 +139,20 @@ mcp-bsl-context -c config.yml
 | — | `MCP_BSL_LOG_ROTATION` | `10 MB` |
 | — | `MCP_BSL_LOG_RETENTION` | `7 days` |
 | — | `MCP_BSL_LOG_LEVEL` | как у сервера (`verbose`) |
+| — | `MCP_BSL_LOG_COLORIZE` | `true` |
 
 ### Логирование
 
 Логи пишутся в **stderr** (stdout зарезервирован под JSON-RPC stdio-транспорта),
-формат: `YYYY-MM-DD HH:mm:ss [LEVEL] module: message`. Уровень — `DEBUG` при
-`--verbose`/`server.verbose: true`, иначе `INFO`. При старте сервер выводит
-сводку по моделям ИИ (режим поиска, источник данных, embeddings/reranker,
-пути хранения); `api_key` никогда не логируется.
+формат: `YYYY-MM-DD HH:mm:ss [LEVEL] module: message`, с ANSI-цветом для всех
+модулей (отключается `logging.colorize: false` / `MCP_BSL_LOG_COLORIZE=false`).
+Уровень — `DEBUG` при `--verbose`/`server.verbose: true`, иначе `INFO`. При
+старте сервер выводит сводку по моделям ИИ (режим поиска, источник данных,
+embeddings/reranker, пути хранения); `api_key` никогда не логируется.
 
 Дополнительно можно включить файловый приёмник с ротацией (по умолчанию
-выключен) через секцию `logging` или переменные `MCP_BSL_LOG_*`:
+выключен; файл всегда без ANSI-цвета) через секцию `logging` или переменные
+`MCP_BSL_LOG_*`:
 
 ```yaml
 logging:
@@ -157,6 +160,7 @@ logging:
   rotation: "10 MB"               # "10 MB", "1 day", ...
   retention: "7 days"
   level: null                     # null = как у сервера
+  colorize: true                  # ANSI-цвета в stderr
 ```
 
 ## Использование

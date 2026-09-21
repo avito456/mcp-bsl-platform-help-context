@@ -84,3 +84,4 @@ logging:
   rotation: "10 MB"            # ротация файла (loguru: "10 MB", "1 day", ...)
   retention: "7 days"          # срок хранения старых файлов
   level: null                  # уровень для файла; null = как у сервера (verbose)
+  colorize: true               # ANSI-цвета в stderr для всех модулей

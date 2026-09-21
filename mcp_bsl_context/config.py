@@ -88,6 +88,7 @@ class LoggingConfig:
     rotation: str | None = None  # e.g. "10 MB", "1 day"
     retention: str | None = None  # e.g. "7 days"
     level: str | None = None  # file sink level; defaults to server level
+    colorize: bool = True  # ANSI colors on stderr (all modules)
 
 
 @dataclass
@@ -188,6 +189,7 @@ _ENV_MAPPING: dict[str, tuple[str, str]] = {
     "MCP_BSL_LOG_ROTATION": ("logging", "rotation"),
     "MCP_BSL_LOG_RETENTION": ("logging", "retention"),
     "MCP_BSL_LOG_LEVEL": ("logging", "level"),
+    "MCP_BSL_LOG_COLORIZE": ("logging", "colorize"),
 }
 
 

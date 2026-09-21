@@ -23,7 +23,12 @@ if TYPE_CHECKING:
 
     from mcp_bsl_context.config import AppConfig
 
-LOG_FORMAT = "{time:YYYY-MM-DD HH:mm:ss} [{level}] {extra[module]}: {message}"
+LOG_FORMAT = (
+    "<green>{time:YYYY-MM-DD HH:mm:ss}</green> "
+    "[<level>{level}</level>] "
+    "<cyan>{extra[module]}</cyan>: "
+    "<level>{message}</level>"
+)
 
 # Third-party loggers routed into loguru by the intercept handler.
 INTERCEPTED_LOGGERS = (
@@ -82,12 +87,15 @@ def setup_logging(config: AppConfig) -> None:
     verbose = bool(getattr(getattr(config, "server", None), "verbose", False))
     level = "DEBUG" if verbose else "INFO"
 
+    log_config: Any = getattr(config, "logging", None)
+    colorize = bool(getattr(log_config, "colorize", True))
+
     logger.remove()
     logger.add(
         sys.stderr,
         level=level,
         format=LOG_FORMAT,
-        colorize=sys.stderr.isatty(),
+        colorize=colorize,
         backtrace=verbose,
         diagnose=False,
     )
@@ -185,6 +193,7 @@ def _add_file_sink(
         str(file_path),
         level=file_level,
         format=LOG_FORMAT,
+        colorize=False,
         rotation=rotation,
         retention=retention,
         encoding="utf-8",
