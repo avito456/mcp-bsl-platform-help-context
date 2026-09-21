@@ -96,6 +96,76 @@ def setup_logging(config: AppConfig) -> None:
     _install_intercept(verbose)
 
 
+def log_ai_models(config: AppConfig) -> None:
+    """Log the configured AI models and where the data comes from.
+
+    The summary is always emitted at INFO so an operator can see which models
+    will be used; connection details (``api_url``, whether an ``api_key`` is
+    set) are emitted at DEBUG. Secret values are never written — the key is
+    only reported as ``***`` when present.
+    """
+    embeddings = getattr(config, "embeddings", None)
+    reranker = getattr(config, "reranker", None)
+    search = getattr(config, "search", None)
+    platform = getattr(config, "platform", None)
+    storage = getattr(config, "storage", None)
+    index = getattr(config, "index", None)
+
+    log = get_logger(__name__)
+
+    log.info(
+        "AI models: search mode={}, data source={}",
+        getattr(search, "default_mode", "?"),
+        getattr(platform, "data_source", "?"),
+    )
+
+    if embeddings is not None:
+        log.info(
+            "Embeddings: provider={}, model={}, device={}",
+            embeddings.provider,
+            embeddings.model,
+            embeddings.device,
+        )
+        log.debug(
+            "Embeddings endpoint: api_url={}, api_key={}",
+            embeddings.api_url or "<default>",
+            _mask_secret(embeddings.api_key),
+        )
+
+    if reranker is not None:
+        if reranker.enabled:
+            log.info(
+                "Reranker: enabled, provider={}, model={}, device={}",
+                reranker.provider,
+                reranker.model,
+                reranker.device,
+            )
+            log.debug(
+                "Reranker endpoint: api_url={}, api_key={}",
+                reranker.api_url or "<default>",
+                _mask_secret(reranker.api_key),
+            )
+        else:
+            log.info("Reranker: disabled")
+
+    if storage is not None:
+        log.info(
+            "Storage: qdrant_path={}, models_cache={}",
+            storage.qdrant_path,
+            storage.models_cache,
+        )
+
+    if index is not None:
+        log.info(
+            "Index flags: reindex={}, warmup={}", index.reindex, index.warmup
+        )
+
+
+def _mask_secret(value: str | None) -> str:
+    """Return ``***`` when a secret is configured, ``<not set>`` otherwise."""
+    return "***" if value else "<not set>"
+
+
 def _add_file_sink(
     config: AppConfig, default_level: str, verbose: bool
 ) -> None:

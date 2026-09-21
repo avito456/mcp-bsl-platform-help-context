@@ -42,7 +42,7 @@ def _run_server(
     warmup: bool | None,
 ) -> None:
     from mcp_bsl_context.config import load_config
-    from mcp_bsl_context.logging_setup import setup_logging
+    from mcp_bsl_context.logging_setup import log_ai_models, setup_logging
 
     # Build CLI overrides dict (None values are skipped by load_config)
     cli_overrides = {
@@ -78,6 +78,8 @@ def _run_server(
     except ConfigValidationError as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
+
+    log_ai_models(app_config)
 
     from mcp_bsl_context.server import create_server
 
