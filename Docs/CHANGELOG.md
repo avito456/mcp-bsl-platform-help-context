@@ -89,6 +89,14 @@
   SERVER_INSTRUCTIONS.
 - **Интеграционные тесты на реальном HBK** и grep-guard, который запрещает
   несуществующие имена API в документации.
+- **Логирование на loguru и лог моделей ИИ при старте.** Логи пишутся в
+  stderr (stdout свободен для stdio JSON-RPC) в формате
+  `YYYY-MM-DD HH:mm:ss [LEVEL] module: message`, уровень `DEBUG` при
+  `--verbose`. При старте выводится сводка по моделям ИИ (режим поиска,
+  источник данных, embeddings/reranker, пути хранения); `api_key` никогда не
+  логируется. Опциональный файловый приёмник с ротацией включается секцией
+  `logging` (`file`/`rotation`/`retention`/`level`) или переменными
+  `MCP_BSL_LOG_*` (по умолчанию выключен).
 
 ### Исправлено
 
@@ -128,3 +136,10 @@
   функциональные слова ≈ 0), матчинг по стему словоформ и по имени
   типа-владельца. RRF вес keyword-списка (`KEYWORD_WEIGHT`) — измеримая
   константа ~1.0 (значения > 1.2 ухудшают ранжирование).
+- Логирование переведено со stdlib `logging` на `loguru`
+  (`mcp_bsl_context/logging_setup.py`): `get_logger(__name__)` биндит модуль для
+  `{extra[module]}`, а stdlib-логи сторонних библиотек (`mcp`, `httpx`,
+  `sentence_transformers`, `qdrant_client`, …) перехватываются в loguru.
+  Формат сообщений обновлён `%s/%d` → `{}`; `logger.exception` сохранён,
+  `exc_info=True` → `logger.opt(exception=True)`. Добавлена зависимость
+  `loguru>=0.7`.
