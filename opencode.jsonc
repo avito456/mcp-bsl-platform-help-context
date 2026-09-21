@@ -7,14 +7,13 @@
         "uv",
         "run",
         "--project",
-        "/Users/ev/workspace/mcp-bsl-platform-help-context",
+        "C:\\temp\\mcp-bsl-platform-help-context",
         "mcp-bsl-context",
         "-c",
-        "/Users/ev/workspace/mcp-bsl-platform-help-context/config.yml"
+        "C:\\temp\\mcp-bsl-platform-help-context\\config.yml"
       ],
-      "cwd": "/Users/ev/workspace/mcp-bsl-platform-help-context",
-      "enabled": true,
-      "timeout": 300000
+      "cwd": "C:\\temp\\mcp-bsl-platform-help-context",
+      "enabled": true
     }
   }
 }
