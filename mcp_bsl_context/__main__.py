@@ -8,14 +8,15 @@ target project (opencode + Claude Code, project scope).
 from __future__ import annotations
 
 import click
-import logging
 import sys
 from pathlib import Path
 
 from mcp_bsl_context import installer
 from mcp_bsl_context.installer import InstallerError
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 def _resolve_target(project: str | None) -> Path:
@@ -41,6 +42,7 @@ def _run_server(
     warmup: bool | None,
 ) -> None:
     from mcp_bsl_context.config import load_config
+    from mcp_bsl_context.logging_setup import setup_logging
 
     # Build CLI overrides dict (None values are skipped by load_config)
     cli_overrides = {
@@ -57,12 +59,7 @@ def _run_server(
 
     app_config = load_config(config_path=config, cli_overrides=cli_overrides)
 
-    log_level = logging.DEBUG if app_config.server.verbose else logging.INFO
-    logging.basicConfig(
-        level=log_level,
-        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        stream=sys.stderr,
-    )
+    setup_logging(app_config)
     # Auto-resolve the platform path when it is not configured (hbk source):
     # bundled HBK in the server repo / OS install dirs first.
     if (
@@ -72,10 +69,7 @@ def _run_server(
         auto = installer.auto_resolve_platform_path()
         if auto:
             app_config.platform.path = auto
-            logger.info("Auto-resolved platform.path: %s", auto)
-    # Suppress noisy MCP SDK request logs (ListToolsRequest, etc.)
-    if not app_config.server.verbose:
-        logging.getLogger("mcp.server.lowlevel.server").setLevel(logging.WARNING)
+            logger.info("Auto-resolved platform.path: {}", auto)
 
     from mcp_bsl_context.config import ConfigValidationError
 

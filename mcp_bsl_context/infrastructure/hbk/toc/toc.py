@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import logging
+from mcp_bsl_context.logging_setup import get_logger
 
 from ..models import Chunk, Page
 from .toc_parser import parse_content
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class Toc:
@@ -81,5 +81,5 @@ class Toc:
         else:
             root = Page(id=0, name_ru="root")
 
-        logger.debug("TOC tree built: %d pages", len(page_map))
+        logger.debug("TOC tree built: {} pages", len(page_map))
         return cls(root)

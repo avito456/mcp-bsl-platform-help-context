@@ -8,12 +8,13 @@ The HBK file format is a proprietary 1C binary container with:
 
 from __future__ import annotations
 
-import logging
 import mmap
 import struct
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class HbkContainerReader:
@@ -31,7 +32,7 @@ class HbkContainerReader:
                 result: dict[str, bytes] = {}
                 for name, body_addr in entities.items():
                     result[name] = self._get_file_body(data, body_addr)
-        logger.debug("HBK container: found %d files: %s", len(result), list(result.keys()))
+        logger.debug("HBK container: found {} files: {}", len(result), list(result.keys()))
         return result
 
     def _parse_file_info(self, data: bytes) -> dict[str, int]:

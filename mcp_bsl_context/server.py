@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import functools
 import importlib.resources as pkg_resources
-import logging
 import re
 import threading
 from pathlib import Path
@@ -31,7 +30,9 @@ from mcp_bsl_context.infrastructure.storage.version_discovery import (
 )
 from mcp_bsl_context.presentation.formatter import MarkdownFormatter
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 MIN_LIMIT = 1
 MAX_LIMIT = 50
@@ -151,7 +152,7 @@ class _LazySemanticState:
             # so a later request can retry initialization from scratch.
             with self._lock:
                 self._warmup_started = False
-            logger.warning("Background warmup failed (keyword mode still works): %s", exc)
+            logger.warning("Background warmup failed (keyword mode still works): {}", exc)
 
     def start_background_warmup(self) -> None:
         """Eagerly load models and prebuild the index in a background thread.
@@ -347,7 +348,7 @@ def create_server(config: AppConfig):
                 except RuntimeError as e:
                     return f"**Error:** {e}"
                 except Exception:
-                    logger.exception("Unexpected error in tool '%s'", fn.__name__)
+                    logger.exception("Unexpected error in tool '{}'", fn.__name__)
                     return (
                         "**Внутренняя ошибка:** произошла непредвиденная ошибка. "
                         "Попробуйте ещё раз или используйте режим keyword."
@@ -433,7 +434,7 @@ def create_server(config: AppConfig):
                 # Semantic/hybrid unavailable — degrade to keyword and say so,
                 # so the model isn't misled into thinking a semantic search ran.
                 logger.warning(
-                    "%s search unavailable (%s); falling back to keyword",
+                    "{} search unavailable ({}); falling back to keyword",
                     effective_mode,
                     exc,
                 )
@@ -706,18 +707,18 @@ def _create_hbk_storage(
         if versioned:
             closest = find_closest_version(target, [d.version for d in versioned])
             resolved = next(d for d in versioned if d.version == closest)
-            logger.info("Requested version %s, resolved to %s", target, closest)
+            logger.info("Requested version {}, resolved to {}", target, closest)
         else:
             resolved = discovered[0]
             logger.warning(
-                "Version %s requested but no version info available, using single HBK",
+                "Version {} requested but no version info available, using single HBK",
                 target,
             )
     else:
         # Default: pick maximum version
         if versioned:
             resolved = max(versioned, key=lambda d: d.version)
-            logger.info("Auto-selected latest version: %s", resolved.version)
+            logger.info("Auto-selected latest version: {}", resolved.version)
         else:
             resolved = discovered[0]
 

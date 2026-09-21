@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 from dataclasses import dataclass
 from pathlib import Path
 
 from mcp_bsl_context.domain.value_objects import PlatformVersion
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 HBK_FILENAME = "shcntx_ru.hbk"
 
@@ -50,14 +51,14 @@ class VersionDiscovery:
         Empty list if nothing found.
         """
         if not platform_path.exists():
-            logger.error("Platform path does not exist: %s", platform_path)
+            logger.error("Platform path does not exist: {}", platform_path)
             return []
 
         # Step 1: scan immediate subdirs for version-pattern directories
         versions = self._scan_version_subdirs(platform_path)
         if versions:
             logger.info(
-                "Multi-version mode: found %d versions in %s",
+                "Multi-version mode: found {} versions in {}",
                 len(versions),
                 platform_path,
             )
@@ -70,7 +71,7 @@ class VersionDiscovery:
                 versions.extend(deeper)
         if versions:
             logger.info(
-                "Multi-version mode (nested): found %d versions under %s",
+                "Multi-version mode (nested): found {} versions under {}",
                 len(versions),
                 platform_path,
             )
@@ -81,7 +82,7 @@ class VersionDiscovery:
         if hbk_path is not None:
             version = PlatformVersion.parse(platform_path.name)
             logger.info(
-                "Single-version mode: HBK found at %s (version: %s)",
+                "Single-version mode: HBK found at {} (version: {})",
                 hbk_path,
                 version or "unknown",
             )
@@ -93,7 +94,7 @@ class VersionDiscovery:
                 )
             ]
 
-        logger.warning("No HBK files found in %s", platform_path)
+        logger.warning("No HBK files found in {}", platform_path)
         return []
 
     def _scan_version_subdirs(self, root: Path) -> list[DiscoveredVersion]:
@@ -116,7 +117,7 @@ class VersionDiscovery:
                     )
                 )
             else:
-                logger.debug("Version dir %s has no HBK file, skipping", child.name)
+                logger.debug("Version dir {} has no HBK file, skipping", child.name)
 
         return results
 
@@ -139,7 +140,7 @@ class VersionDiscovery:
                 if path.is_file():
                     return path
         except PermissionError:
-            logger.warning("Permission denied during rglob in %s", dir_path)
+            logger.warning("Permission denied during rglob in {}", dir_path)
 
         return None
 
@@ -149,5 +150,5 @@ class VersionDiscovery:
         try:
             return list(path.iterdir())
         except PermissionError:
-            logger.warning("Permission denied: %s", path)
+            logger.warning("Permission denied: {}", path)
             return []

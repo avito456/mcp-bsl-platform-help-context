@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import difflib
-import logging
 import threading
 from typing import TYPE_CHECKING, Protocol
 
@@ -29,7 +28,9 @@ from .strategies import (
 if TYPE_CHECKING:
     from mcp_bsl_context.infrastructure.storage.storage import PlatformContextStorage
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 MAX_RESULTS = 50
 
@@ -95,7 +96,7 @@ class SimpleSearchEngine:
                     self._candidate_names.append(n)
 
         logger.info(
-            "Indexes loaded: %d methods, %d properties, %d types",
+            "Indexes loaded: {} methods, {} properties, {} types",
             self._hash_indexes.methods.size,
             self._hash_indexes.properties.size,
             self._hash_indexes.types.size,

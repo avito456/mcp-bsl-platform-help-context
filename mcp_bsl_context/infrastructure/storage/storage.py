@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import threading
 from pathlib import Path
 
@@ -17,7 +16,9 @@ from .loader import PlatformContextLoader
 from .mapper import method_info_to_entity, object_info_to_entity, property_info_to_entity
 from .supplement import load_default_supplement, merge_supplement_methods
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 def build_member_index(
@@ -92,7 +93,7 @@ class PlatformContextStorage:
 
     def _do_load(self) -> None:
         """Load platform context from HBK file."""
-        logger.info("Loading platform context from: %s", self._platform_path)
+        logger.info("Loading platform context from: {}", self._platform_path)
         context = self._loader.load(self._platform_path)
 
         self.methods = [method_info_to_entity(m) for m in context.global_methods]
@@ -106,14 +107,14 @@ class PlatformContextStorage:
                 self.methods = merged
                 if added:
                     logger.info(
-                        "%d глобальных метода(ов) добавлено из супплемента",
+                        "{} глобальных метода(ов) добавлено из супплемента",
                         added,
                     )
 
         self.members, self.member_owner = build_member_index(self.types)
 
         logger.info(
-            "Platform context loaded: %d methods, %d properties, %d types",
+            "Platform context loaded: {} methods, {} properties, {} types",
             len(self.methods),
             len(self.properties),
             len(self.types),

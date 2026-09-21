@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import logging
 import zipfile
 from pathlib import Path
 from typing import Callable
@@ -11,7 +10,9 @@ from typing import Callable
 from .container_reader import HbkContainerReader
 from .toc.toc import Toc
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class HbkContext:
@@ -43,7 +44,7 @@ class HbkContext:
             if original is not None:
                 return self._zip.read(original).decode("utf-8-sig", errors="replace")
         except (KeyError, zipfile.BadZipFile) as e:
-            logger.warning("Failed to read page '%s': %s", path, e)
+            logger.warning("Failed to read page '{}': {}", path, e)
         return None
 
 

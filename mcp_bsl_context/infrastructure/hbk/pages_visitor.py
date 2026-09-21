@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Iterator
 
 from .content_reader import HbkContext
@@ -16,7 +15,9 @@ from .models import (
 )
 from .parsers.pages_parser import PlatformContextPagesParser
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 # Page classification constants
 GLOBAL_CONTEXT_MARKER = "Global context"
@@ -137,7 +138,7 @@ class PlatformContextPagesVisitor:
                         method.name_en = child.name_en
                     yield method
                 except Exception as e:
-                    logger.warning("Failed to parse method page '%s': %s", child.path, e)
+                    logger.warning("Failed to parse method page '{}': {}", child.path, e)
 
     def _visit_properties_page(self, page: Page) -> Iterator[PropertyInfo]:
         """Visit a properties container page and parse each child property."""
@@ -152,7 +153,7 @@ class PlatformContextPagesVisitor:
                         prop.name_en = child.name_en
                     yield prop
                 except Exception as e:
-                    logger.warning("Failed to parse property page '%s': %s", child.path, e)
+                    logger.warning("Failed to parse property page '{}': {}", child.path, e)
 
     def _visit_constructors_page(self, page: Page) -> list[SignatureInfo]:
         """Visit constructors page and parse constructor signatures."""
@@ -164,7 +165,7 @@ class PlatformContextPagesVisitor:
                     ctor = self._parser.parse_constructor(html)
                     constructors.append(ctor)
                 except Exception as e:
-                    logger.warning("Failed to parse constructor page '%s': %s", child.path, e)
+                    logger.warning("Failed to parse constructor page '{}': {}", child.path, e)
         return constructors
 
     def _visit_type_catalog(self, page: Page) -> Iterator[ObjectInfo]:
@@ -202,7 +203,7 @@ class PlatformContextPagesVisitor:
 
                 yield obj
             except Exception as e:
-                logger.warning("Failed to parse type page '%s': %s", type_page.path, e)
+                logger.warning("Failed to parse type page '{}': {}", type_page.path, e)
 
     def _is_subcatalog(self, page: Page) -> bool:
         """Check if a page is a sub-catalog containing type pages (not a type itself)."""
@@ -236,8 +237,8 @@ class PlatformContextPagesVisitor:
                                 value = self._parser.parse_enum_value(child_html)
                                 enum.values.append(value)
                             except Exception as e:
-                                logger.warning("Failed to parse enum value '%s': %s", child.path, e)
+                                logger.warning("Failed to parse enum value '{}': {}", child.path, e)
 
                     yield enum
                 except Exception as e:
-                    logger.warning("Failed to parse enum page '%s': %s", enum_page.path, e)
+                    logger.warning("Failed to parse enum page '{}': {}", enum_page.path, e)

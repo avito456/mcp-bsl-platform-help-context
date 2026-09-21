@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from .entities import Definition, PlatformTypeDefinition, Signature
@@ -17,8 +16,6 @@ from .value_objects import SearchQuery
 
 if TYPE_CHECKING:
     from mcp_bsl_context.infrastructure.storage.repository import PlatformRepository
-
-logger = logging.getLogger(__name__)
 
 MIN_LIMIT = 1
 MAX_LIMIT = 50

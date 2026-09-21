@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass, field, fields
 from pathlib import Path
@@ -10,7 +9,9 @@ from typing import Any
 
 from mcp_bsl_context.domain.exceptions import DomainException
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 VALID_SEARCH_MODES = {"keyword", "semantic", "hybrid"}
 VALID_DATA_SOURCES = {"hbk", "json"}
@@ -208,7 +209,7 @@ def _apply_yaml(config: AppConfig, config_path: str) -> None:
     """Load YAML file and apply values to config."""
     path = Path(config_path)
     if not path.is_file():
-        logger.warning("Config file not found: %s, using defaults", config_path)
+        logger.warning("Config file not found: {}, using defaults", config_path)
         return
 
     try:
@@ -221,7 +222,7 @@ def _apply_yaml(config: AppConfig, config_path: str) -> None:
         data = yaml.safe_load(f)
 
     if not isinstance(data, dict):
-        logger.warning("Config file is not a valid YAML mapping: %s", config_path)
+        logger.warning("Config file is not a valid YAML mapping: {}", config_path)
         return
 
     for section_name, section_data in data.items():
@@ -229,11 +230,11 @@ def _apply_yaml(config: AppConfig, config_path: str) -> None:
             continue
         section = getattr(config, section_name, None)
         if section is None:
-            logger.warning("Unknown config section: %s", section_name)
+            logger.warning("Unknown config section: {}", section_name)
             continue
         _set_section_fields(section, section_data)
 
-    logger.info("Loaded config from %s", config_path)
+    logger.info("Loaded config from {}", config_path)
 
 
 def _apply_env_vars(config: AppConfig) -> None:
@@ -269,7 +270,7 @@ def _set_section_fields(section: Any, data: dict[str, Any]) -> None:
     for key, value in data.items():
         if key not in section_fields:
             logger.warning(
-                "Unknown config key '%s' in section %s — ignored",
+                "Unknown config key '{}' in section {} — ignored",
                 key,
                 type(section).__name__,
             )
@@ -311,7 +312,7 @@ def _coerce_value(value: Any, type_hint: str | type | None) -> Any:
                 return True
             if normalized not in ("false", "0", "no", ""):
                 logger.warning(
-                    "Invalid boolean value %r — using False", value
+                    "Invalid boolean value {} — using False", value
                 )
             return False
         return bool(value)
@@ -321,7 +322,7 @@ def _coerce_value(value: Any, type_hint: str | type | None) -> Any:
             return int(value)
         except (ValueError, TypeError):
             logger.warning(
-                "Invalid integer value %r — keeping default",
+                "Invalid integer value {} — keeping default",
                 value,
             )
             return None

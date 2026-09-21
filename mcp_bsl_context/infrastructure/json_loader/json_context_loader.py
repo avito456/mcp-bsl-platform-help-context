@@ -6,7 +6,6 @@ Supports loading from JSON exported by platform-context-exporter tool.
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
 
 from mcp_bsl_context.domain.entities import (
@@ -17,7 +16,9 @@ from mcp_bsl_context.domain.entities import (
     Signature,
 )
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 class JsonContextLoader:
@@ -57,17 +58,17 @@ class JsonContextLoader:
         methods_file = directory / "methods.json"
         if methods_file.exists():
             methods = self.load_methods(methods_file)
-            logger.info("Loaded %d methods from JSON", len(methods))
+            logger.info("Loaded {} methods from JSON", len(methods))
 
         props_file = directory / "properties.json"
         if props_file.exists():
             properties = self.load_properties(props_file)
-            logger.info("Loaded %d properties from JSON", len(properties))
+            logger.info("Loaded {} properties from JSON", len(properties))
 
         types_file = directory / "types.json"
         if types_file.exists():
             types = self.load_types(types_file)
-            logger.info("Loaded %d types from JSON", len(types))
+            logger.info("Loaded {} types from JSON", len(types))
 
         # Try single combined file
         combined = directory / "context.json"
@@ -76,7 +77,7 @@ class JsonContextLoader:
             methods = [self._parse_method(m) for m in data.get("methods", [])]
             properties = [self._parse_property(p) for p in data.get("properties", [])]
             types = [self._parse_type(t) for t in data.get("types", [])]
-            logger.info("Loaded from combined JSON: %d methods, %d properties, %d types",
+            logger.info("Loaded from combined JSON: {} methods, {} properties, {} types",
                         len(methods), len(properties), len(types))
 
         return methods, properties, types

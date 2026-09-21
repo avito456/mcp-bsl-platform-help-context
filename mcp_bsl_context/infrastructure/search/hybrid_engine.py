@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from mcp_bsl_context.domain.entities import (
@@ -17,8 +16,6 @@ from mcp_bsl_context.infrastructure.search.semantic_engine import SemanticSearch
 
 if TYPE_CHECKING:
     from mcp_bsl_context.infrastructure.storage.storage import PlatformContextStorage
-
-logger = logging.getLogger(__name__)
 
 # Standard RRF constant from the original paper (Cormack et al., 2009).
 RRF_K = 60

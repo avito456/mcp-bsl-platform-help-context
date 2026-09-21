@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import importlib.resources as pkg_resources
 import json
-import logging
 from typing import Any
 
 from mcp_bsl_context.domain.entities import (
@@ -20,7 +19,9 @@ from mcp_bsl_context.domain.entities import (
     Signature,
 )
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 DEFAULT_SUPPLEMENT_FILENAME = "global_methods_supplement.json"
 
@@ -38,7 +39,7 @@ def load_default_supplement() -> list[MethodDefinition]:
         content = ref.read_text(encoding="utf-8")
     except Exception as exc:
         logger.warning(
-            "Не удалось прочитать супплемент глобальных методов (%s): %s",
+            "Не удалось прочитать супплемент глобальных методов ({}): {}",
             DEFAULT_SUPPLEMENT_FILENAME,
             exc,
         )
@@ -56,7 +57,7 @@ def parse_supplement_entries(data: str | list | dict) -> list[MethodDefinition]:
         try:
             payload = json.loads(data)
         except json.JSONDecodeError as exc:
-            logger.warning("Супплемент глобальных методов: не JSON (%s)", exc)
+            logger.warning("Супплемент глобальных методов: не JSON ({})", exc)
             return []
     else:
         payload = data

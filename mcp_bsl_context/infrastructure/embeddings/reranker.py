@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from mcp_bsl_context.config import RerankerConfig
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -66,7 +67,7 @@ class LocalReranker(Reranker):
             os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", cache_dir)
             os.environ.setdefault("HF_HOME", cache_dir)
 
-        logger.info("Loading reranker model: %s (device=%s)", model_name, device)
+        logger.info("Loading reranker model: {} (device={})", model_name, device)
         self._model = CrossEncoder(model_name, max_length=512, device=device)
         logger.info("Reranker model loaded")
 
@@ -135,11 +136,11 @@ class OpenAICompatibleReranker(Reranker):
         for item in data.get("results", []):
             idx = item.get("index")
             if idx is None:
-                logger.warning("Rerank response item missing 'index': %s", item)
+                logger.warning("Rerank response item missing 'index': {}", item)
                 continue
             if not 0 <= idx < len(documents):
                 logger.warning(
-                    "Rerank response index %d out of range (0..%d)", idx, len(documents)
+                    "Rerank response index {} out of range (0..{})", idx, len(documents)
                 )
                 continue
             score = float(item.get("relevance_score", item.get("score", 0.0)))

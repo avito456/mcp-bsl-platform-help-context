@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 
 from mcp_bsl_context.domain.exceptions import PlatformContextLoadException
 from mcp_bsl_context.infrastructure.hbk.context_reader import PlatformContext, PlatformContextReader
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 HBK_FILENAME = "shcntx_ru.hbk"
 
@@ -27,14 +28,14 @@ class PlatformContextLoader:
                 f"Help file '{HBK_FILENAME}' not found in '{platform_path}'"
             )
 
-        logger.info("Found HBK file: %s", hbk_path)
+        logger.info("Found HBK file: {}", hbk_path)
         return self._reader.read(hbk_path)
 
     @staticmethod
     def _find_hbk_file(platform_path: Path) -> Path | None:
         """Recursively search for the HBK file in the platform directory."""
         if not platform_path.exists():
-            logger.error("Platform path does not exist: %s", platform_path)
+            logger.error("Platform path does not exist: {}", platform_path)
             return None
 
         # Direct check

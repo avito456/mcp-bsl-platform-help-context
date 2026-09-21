@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import logging
 import os
 import time
 from abc import ABC, abstractmethod
 
 from mcp_bsl_context.config import EmbeddingsConfig
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 _MAX_MATRIX_RETRIES = 3
 _TIMEOUT = 120.0
@@ -72,12 +73,12 @@ class LocalEmbeddingProvider(EmbeddingProvider):
         if cache_dir:
             os.environ.setdefault("SENTENCE_TRANSFORMERS_HOME", cache_dir)
 
-        logger.info("Loading embedding model: %s (device=%s)", model_name, device)
+        logger.info("Loading embedding model: {} (device={})", model_name, device)
         self._model = SentenceTransformer(
             model_name, cache_folder=cache_dir, device=device
         )
         self._dim: int = self._model.get_sentence_embedding_dimension()
-        logger.info("Embedding model loaded, dimension: %d", self._dim)
+        logger.info("Embedding model loaded, dimension: {}", self._dim)
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
         embeddings = self._model.encode(
@@ -142,7 +143,7 @@ class OpenAICompatibleEmbeddingProvider(EmbeddingProvider):
             except (httpx.TransportError, httpx.HTTPStatusError) as exc:
                 if attempt < _MAX_MATRIX_RETRIES - 1:
                     logger.warning(
-                        "Embedding API request failed (%s), retrying (%d/%d)",
+                        "Embedding API request failed ({}), retrying ({}/{})",
                         exc, attempt + 1, _MAX_MATRIX_RETRIES,
                     )
                     time.sleep(2**attempt)

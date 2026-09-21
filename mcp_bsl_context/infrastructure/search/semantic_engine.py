@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 import threading
 import uuid
 from pathlib import Path
@@ -16,7 +15,9 @@ from mcp_bsl_context.infrastructure.embeddings.reranker import Reranker
 if TYPE_CHECKING:
     from mcp_bsl_context.infrastructure.storage.storage import PlatformContextStorage
 
-logger = logging.getLogger(__name__)
+from mcp_bsl_context.logging_setup import get_logger
+
+logger = get_logger(__name__)
 
 COLLECTION_NAME = "platform_context"
 UPSERT_BATCH_SIZE = 100
@@ -177,7 +178,7 @@ class SemanticSearchEngine:
                     info = self._client.get_collection(COLLECTION_NAME)
                 except Exception:
                     logger.exception(
-                        "Failed to inspect collection '%s'", COLLECTION_NAME
+                        "Failed to inspect collection '{}'", COLLECTION_NAME
                     )
                     return False
                 return info.points_count > 0
@@ -210,7 +211,7 @@ class SemanticSearchEngine:
             self._fingerprint_path().write_text(fingerprint, encoding="utf-8")
         except OSError:
             logger.exception(
-                "Failed to write index fingerprint to %s", self._fingerprint_path()
+                "Failed to write index fingerprint to {}", self._fingerprint_path()
             )
 
     def _build_index(self, storage: PlatformContextStorage) -> None:
@@ -224,7 +225,7 @@ class SemanticSearchEngine:
             return
 
         texts = [doc.text for doc in docs]
-        logger.info("Embedding %d documents...", len(texts))
+        logger.info("Embedding {} documents...", len(texts))
         vectors = self._embedder.embed_documents(texts)
         if len(vectors) != len(docs):
             raise RuntimeError(
@@ -235,9 +236,9 @@ class SemanticSearchEngine:
         # Recreate collection
         try:
             self._client.delete_collection(COLLECTION_NAME)
-            logger.info("Dropped existing collection '%s'", COLLECTION_NAME)
+            logger.info("Dropped existing collection '{}'", COLLECTION_NAME)
         except Exception:
-            logger.debug("No existing collection to drop", exc_info=True)
+            logger.opt(exception=True).debug("No existing collection to drop")
 
         self._client.create_collection(
             collection_name=COLLECTION_NAME,
@@ -264,7 +265,7 @@ class SemanticSearchEngine:
                 collection_name=COLLECTION_NAME, points=points
             )
 
-        logger.info("Semantic index built: %d documents indexed", len(docs))
+        logger.info("Semantic index built: {} documents indexed", len(docs))
 
     def _build_lookup(self, storage: PlatformContextStorage) -> None:
         """Build in-memory lookup dict for resolving Qdrant results to Definitions."""
@@ -284,7 +285,7 @@ class SemanticSearchEngine:
                 lookup[("property", type_def.name, prop.name)] = prop
 
         self._lookup = lookup
-        logger.debug("Lookup table built: %d entries", len(lookup))
+        logger.debug("Lookup table built: {} entries", len(lookup))
 
     def _resolve_definition(self, payload: dict) -> Definition | None:
         """Resolve a Qdrant payload back to a Definition object."""
