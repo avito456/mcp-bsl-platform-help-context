@@ -83,6 +83,14 @@ class DocsConfig:
 
 
 @dataclass
+class LoggingConfig:
+    file: str | None = None  # disable file sink when None
+    rotation: str | None = None  # e.g. "10 MB", "1 day"
+    retention: str | None = None  # e.g. "7 days"
+    level: str | None = None  # file sink level; defaults to server level
+
+
+@dataclass
 class AppConfig:
     server: ServerConfig = field(default_factory=ServerConfig)
     platform: PlatformConfig = field(default_factory=PlatformConfig)
@@ -92,6 +100,7 @@ class AppConfig:
     storage: StorageConfig = field(default_factory=StorageConfig)
     index: IndexConfig = field(default_factory=IndexConfig)
     docs: DocsConfig = field(default_factory=DocsConfig)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     def validate(self) -> None:
         """Validate the resolved configuration, raising ConfigValidationError.
@@ -175,6 +184,10 @@ _ENV_MAPPING: dict[str, tuple[str, str]] = {
     "MCP_BSL_INDEX_WARMUP": ("index", "warmup"),
     "MCP_BSL_DOCS_STRICT_TYPES_PATH": ("docs", "strict_types_path"),
     "MCP_BSL_DOCS_GUIDELINE_PATH": ("docs", "guideline_path"),
+    "MCP_BSL_LOG_FILE": ("logging", "file"),
+    "MCP_BSL_LOG_ROTATION": ("logging", "rotation"),
+    "MCP_BSL_LOG_RETENTION": ("logging", "retention"),
+    "MCP_BSL_LOG_LEVEL": ("logging", "level"),
 }
 
 

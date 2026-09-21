@@ -102,7 +102,7 @@ mcp-bsl-context -c config.yml
 
 **Приоритет конфигурации:** YAML < переменные окружения (`MCP_BSL_*`) < CLI-аргументы.
 
-Основные секции: `server`, `platform`, `search`, `embeddings`, `reranker`, `storage`, `index`, `docs`.
+Основные секции: `server`, `platform`, `search`, `embeddings`, `reranker`, `storage`, `index`, `docs`, `logging`.
 
 ### Параметры CLI
 
@@ -135,6 +135,29 @@ mcp-bsl-context -c config.yml
 | `--host` | `MCP_BSL_HOST` | `127.0.0.1` |
 | — | `MCP_BSL_DOCS_STRICT_TYPES_PATH` | null (встроенный) |
 | — | `MCP_BSL_DOCS_GUIDELINE_PATH` | null (встроенный) |
+| — | `MCP_BSL_LOG_FILE` | null (только stderr) |
+| — | `MCP_BSL_LOG_ROTATION` | `10 MB` |
+| — | `MCP_BSL_LOG_RETENTION` | `7 days` |
+| — | `MCP_BSL_LOG_LEVEL` | как у сервера (`verbose`) |
+
+### Логирование
+
+Логи пишутся в **stderr** (stdout зарезервирован под JSON-RPC stdio-транспорта),
+формат: `YYYY-MM-DD HH:mm:ss [LEVEL] module: message`. Уровень — `DEBUG` при
+`--verbose`/`server.verbose: true`, иначе `INFO`. При старте сервер выводит
+сводку по моделям ИИ (режим поиска, источник данных, embeddings/reranker,
+пути хранения); `api_key` никогда не логируется.
+
+Дополнительно можно включить файловый приёмник с ротацией (по умолчанию
+выключен) через секцию `logging` или переменные `MCP_BSL_LOG_*`:
+
+```yaml
+logging:
+  file: ./data/logs/mcp-bsl.log   # null = только stderr
+  rotation: "10 MB"               # "10 MB", "1 day", ...
+  retention: "7 days"
+  level: null                     # null = как у сервера
+```
 
 ## Использование
 

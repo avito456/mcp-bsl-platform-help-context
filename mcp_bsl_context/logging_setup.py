@@ -177,7 +177,9 @@ def _add_file_sink(
 
     rotation = getattr(log_config, "rotation", None) or "10 MB"
     retention = getattr(log_config, "retention", None) or "7 days"
-    file_level = getattr(log_config, "level", None) or default_level
+    file_level = _normalize_level(
+        getattr(log_config, "level", None), default_level
+    )
 
     logger.add(
         str(file_path),
@@ -189,6 +191,24 @@ def _add_file_sink(
         backtrace=verbose,
         diagnose=False,
     )
+
+
+_STANDARD_LEVELS = frozenset(
+    {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
+)
+
+
+def _normalize_level(value: Any, fallback: str) -> str:
+    """Return an uppercase loguru level, or ``fallback`` when invalid."""
+    if value is None:
+        return fallback
+    candidate = str(value).strip().upper()
+    if candidate in _STANDARD_LEVELS:
+        return candidate
+    get_logger(__name__).warning(
+        "Invalid log level '{}' for file sink — using {}", value, fallback
+    )
+    return fallback
 
 
 def _install_intercept(verbose: bool) -> None:

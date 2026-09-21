@@ -76,3 +76,11 @@ index:
 docs:
   strict_types_path: null      # Кастомный путь к strict-types.md
   guideline_path: null         # Кастомный путь к guideline.md
+
+# Логирование (необязательно). Логи всегда пишутся в stderr; файловый
+# приёмник включается только при заданном file.
+logging:
+  file: null                   # путь к лог-файлу; null = только stderr
+  rotation: "10 MB"            # ротация файла (loguru: "10 MB", "1 day", ...)
+  retention: "7 days"          # срок хранения старых файлов
+  level: null                  # уровень для файла; null = как у сервера (verbose)
